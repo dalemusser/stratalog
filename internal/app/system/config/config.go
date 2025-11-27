@@ -62,6 +62,9 @@ type Config struct {
 	// choose at the handler level whether to reuse IngestAPIKey or allow open.
 	AdminAPIKey string `mapstructure:"admin_api_key"`
 
+	/* HTTP behavior */
+	MaxRequestBodyBytes int64 `mapstructure:"max_request_body_bytes"`
+
 	/* misc */
 	EnableCompression bool `mapstructure:"enable_compression"`
 	EnableCORS        bool `mapstructure:"enable_cors"`
@@ -142,6 +145,9 @@ func Load() (*Config, error) {
 	// API keys
 	pflag.String("ingest_api_key", "", "API key for log ingestion endpoints")
 	pflag.String("admin_api_key", "", "API key for admin/view endpoints (optional)")
+
+	// Request size limit
+	pflag.Int64("max_request_body_bytes", 2<<20, "Max HTTP request body size in bytes (0 = unlimited)")
 
 	pflag.Parse()
 
@@ -251,6 +257,7 @@ func allKeys() []string {
 		"cert_file", "key_file", "domain",
 		"lets_encrypt_challenge", "route53_hosted_zone_id",
 		"enable_compression", "enable_cors",
+		"max_request_body_bytes",
 		// CORS
 		"cors_allowed_origins", "cors_allowed_methods", "cors_allowed_headers",
 		"cors_exposed_headers", "cors_allow_credentials", "cors_max_age",
@@ -293,6 +300,8 @@ func setDefaults(v *viper.Viper) {
 
 	v.SetDefault("ingest_api_key", "")
 	v.SetDefault("admin_api_key", "")
+
+	v.SetDefault("max_request_body_bytes", 2<<20) // 2 MiB default
 }
 
 // normalizeListKeys coerces JSON-string values into []string for the given keys.
@@ -429,6 +438,10 @@ func validateConfig(cfg Config) error {
 		if cfg.CORSMaxAge < 0 {
 			invalid = append(invalid, "CORS: cors_max_age must be >= 0")
 		}
+	}
+
+	if cfg.MaxRequestBodyBytes < 0 {
+		invalid = append(invalid, "max_request_body_bytes must be >= 0 (0 means unlimited)")
 	}
 
 	if len(missing) == 0 && len(invalid) == 0 {

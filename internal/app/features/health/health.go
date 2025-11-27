@@ -3,11 +3,11 @@ package health
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"time"
 
 	"github.com/dalemusser/stratalog/internal/app/system/handler"
+	"github.com/dalemusser/stratalog/internal/platform/httputil"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 	"go.uber.org/zap"
 )
@@ -17,31 +17,27 @@ type Handler struct{ h *handler.Handler }
 
 // Serve handles GET /health
 //
-// Response (200):
+// Success (200):
 //
 //	{ "status":"ok", "database":"connected" }
 //
-// Response (503):
+// Failure (503):
 //
-//	{ "status":"error", "message":"Database unavailable", "error":"…"}
+//	{ "error":"database_unavailable", "message":"Database unavailable" }
 func (hh *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 	defer cancel()
 
-	w.Header().Set("Content-Type", "application/json")
-
 	if err := hh.h.Client.Ping(ctx, readpref.Primary()); err != nil {
 		zap.L().Error("health-check: mongo ping failed", zap.Error(err))
-		w.WriteHeader(http.StatusServiceUnavailable)
-		_ = json.NewEncoder(w).Encode(map[string]string{
-			"status":  "error",
-			"message": "Database unavailable",
-			"error":   err.Error(),
-		})
+		httputil.JSONError(w, http.StatusServiceUnavailable,
+			"database_unavailable",
+			"Database unavailable",
+		)
 		return
 	}
 
-	_ = json.NewEncoder(w).Encode(map[string]string{
+	httputil.WriteJSON(w, http.StatusOK, map[string]string{
 		"status":   "ok",
 		"database": "connected",
 	})

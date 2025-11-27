@@ -14,7 +14,9 @@ import (
 
 	"github.com/dalemusser/stratalog/internal/app/system/config"
 	"github.com/dalemusser/stratalog/internal/app/system/handler"
+	appmetrics "github.com/dalemusser/stratalog/internal/app/system/metrics"
 	"github.com/dalemusser/stratalog/internal/app/system/routes"
+	"github.com/dalemusser/stratalog/internal/platform/httputil"
 
 	"github.com/andybalholm/brotli"
 	"github.com/go-chi/chi/v5"
@@ -38,13 +40,26 @@ func StartServerWithContext(ctx context.Context, cfg *config.Config, mongoClient
 	h := handler.NewHandler(cfg, mongoClient)
 	r := chi.NewRouter()
 
+	// Unified 404 / 405 handlers
+	r.NotFound(httputil.NotFoundHandler)
+	r.MethodNotAllowed(httputil.MethodNotAllowedHandler)
+
 	// Early drop of obvious junk (no logs for these)
 	r.Use(blockScans) // short-circuit scanner junk
 
 	// Request context & safety
-	r.Use(middleware.RequestID) // stable ID for tracing
-	r.Use(middleware.RealIP)    // correct client IP
-	r.Use(middleware.Recoverer) // turn panics into 500s
+	r.Use(middleware.RequestID)  // stable ID for tracing
+	r.Use(middleware.RealIP)     // correct client IP
+	r.Use(zapRecoverer(zap.L())) // turn panics into 500s with zap stack logging
+
+	// Request size limit (applies to all methods/paths)
+	limit := cfg.MaxRequestBodyBytes
+	// Optional: if you ever want a hardcoded safety floor, you could enforce it here.
+	// if limit <= 0 { limit = 2 << 20 } // but with defaults, 0 already means "no limit".
+	r.Use(httputil.LimitBodySize(limit))
+
+	// Prometheus metrics
+	r.Use(appmetrics.Metrics) // track metrics
 
 	// Cross-cutting behavior that affects responses
 
@@ -168,6 +183,34 @@ func StartServerWithContext(ctx context.Context, cfg *config.Config, mongoClient
 		}
 		ln = tls.NewListener(base, tlsCfg)
 		zap.L().Info("HTTPS server (Let's Encrypt http-01) listening",
+			zap.String("addr", httpsAddr),
+			zap.String("domain", cfg.Domain))
+		go servePrimary(srv, ln, serveErr)
+
+	// ----------------------- HTTPS via Let's Encrypt (dns-01 / Route53) ---
+	case cfg.UseLetsEncrypt && strings.ToLower(strings.TrimSpace(cfg.LetsEncryptChallenge)) == "dns-01":
+		// No aux server on :80 needed for dns-01 — all validation is via DNS.
+		zap.L().Info("initializing DNS-01 (Route53) ACME flow",
+			zap.String("domain", cfg.Domain),
+			zap.String("cache_dir", cfg.LetsEncryptCacheDir))
+
+		cert, e := obtainOrLoadDNSCert(cfg)
+		if e != nil {
+			return fmt.Errorf("dns-01 cert obtain/load failed: %w", e)
+		}
+
+		tlsCfg := &tls.Config{
+			MinVersion:   tls.VersionTLS12,
+			Certificates: []tls.Certificate{cert},
+		}
+		srv.TLSConfig = tlsCfg
+
+		base, e := net.Listen("tcp", httpsAddr)
+		if e != nil {
+			return fmt.Errorf("listen https %s: %w", httpsAddr, e)
+		}
+		ln = tls.NewListener(base, tlsCfg)
+		zap.L().Info("HTTPS server (Let's Encrypt dns-01 / Route53) listening",
 			zap.String("addr", httpsAddr),
 			zap.String("domain", cfg.Domain))
 		go servePrimary(srv, ln, serveErr)
@@ -328,3 +371,15 @@ func waitForCert(ctx context.Context, m *autocert.Manager, host string, timeout 
 		time.Sleep(1 * time.Second)
 	}
 }
+
+/* toml for dns-01 (Route53) Let's Encrypt example
+
+use_https = true
+use_lets_encrypt = true
+domain = "sussout.games"
+lets_encrypt_email = "you@example.com"
+lets_encrypt_challenge = "dns-01"
+lets_encrypt_cache_dir = "letsencrypt-cache"
+
+# AWS credentials via env / instance profile
+*/

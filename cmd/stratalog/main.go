@@ -3,14 +3,18 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"net/url"
 	"os"
 	"os/signal"
 	"runtime"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/dalemusser/stratalog/internal/app/system/config"
 	"github.com/dalemusser/stratalog/internal/app/system/indexes"
+	"github.com/dalemusser/stratalog/internal/app/system/metrics"
 	"github.com/dalemusser/stratalog/internal/app/system/server"
 	"github.com/dalemusser/stratalog/internal/app/system/validators"
 	"github.com/dalemusser/stratalog/internal/platform/db"
@@ -48,13 +52,114 @@ func buildBootstrapLogger() *zap.Logger {
 	return l
 }
 
+// redactMongoURI strips any password from the Mongo URI before logging.
+// It preserves the username (if present) but replaces the password with "****".
+func redactMongoURI(raw string) string {
+	if raw == "" {
+		return raw
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u.User == nil {
+		return raw
+	}
+	username := u.User.Username()
+	if _, hasPwd := u.User.Password(); hasPwd {
+		u.User = url.UserPassword(username, "****")
+	} else if username != "" {
+		u.User = url.User(username)
+	} else {
+		u.User = nil
+	}
+	return u.String()
+}
+
+func logStartupSummary(cfg *config.Config) {
+	sugar := zap.S()
+
+	// TLS mode summary
+	tlsMode := "http-only"
+	if cfg.UseHTTPS {
+		if cfg.UseLetsEncrypt {
+			chal := strings.ToLower(strings.TrimSpace(cfg.LetsEncryptChallenge))
+			if chal == "" || chal == "http-01" {
+				tlsMode = "https (Let's Encrypt http-01)"
+			} else {
+				tlsMode = "https (Let's Encrypt dns-01 / Route53)"
+			}
+		} else {
+			tlsMode = "https (manual certs)"
+		}
+	}
+
+	// Request size summary
+	reqLimit := cfg.MaxRequestBodyBytes
+	reqLimitHuman := "unlimited"
+	if reqLimit > 0 {
+		reqLimitHuman = fmt.Sprintf("%d bytes", reqLimit)
+	}
+
+	// API key presence (redacted)
+	hasIngestKey := strings.TrimSpace(cfg.IngestAPIKey) != ""
+	hasAdminKey := strings.TrimSpace(cfg.AdminAPIKey) != ""
+
+	// DB URI (redacted: strip password if present)
+	redactedMongoURI := redactMongoURI(cfg.MongoURI)
+
+	sugar.Infow("startup configuration",
+		// runtime
+		"env", cfg.Env,
+		"log_level", cfg.LogLevel,
+
+		// network / TLS
+		"http_port", cfg.HTTPPort,
+		"https_port", cfg.HTTPSPort,
+		"use_https", cfg.UseHTTPS,
+		"use_lets_encrypt", cfg.UseLetsEncrypt,
+		"tls_mode", tlsMode,
+		"domain", cfg.Domain,
+
+		// ACME details (non-secret)
+		"lets_encrypt_challenge", cfg.LetsEncryptChallenge,
+		"lets_encrypt_cache_dir", cfg.LetsEncryptCacheDir,
+
+		// DB (URI redacted; no credentials logged)
+		"mongo_uri", redactedMongoURI,
+		"mongo_database", cfg.MongoDatabase,
+		"index_boot_timeout", cfg.IndexBootTimeout.String(),
+
+		// HTTP behavior
+		"max_request_body_bytes", reqLimit,
+		"max_request_body_human", reqLimitHuman,
+		"enable_compression", cfg.EnableCompression,
+		"enable_cors", cfg.EnableCORS,
+
+		// CORS footprint
+		"cors_allowed_origins", len(cfg.CORSAllowedOrigins),
+		"cors_allowed_methods", len(cfg.CORSAllowedMethods),
+		"cors_allowed_headers", len(cfg.CORSAllowedHeaders),
+
+		// security (presence only, values redacted)
+		"has_ingest_api_key", hasIngestKey,
+		"has_admin_api_key", hasAdminKey,
+
+		// observability
+		"metrics_endpoint", "/metrics",
+		"pprof_prefix", "/debug/pprof",
+		"health_endpoint", "/health",
+	)
+}
+
 func main() {
 	// -------------------------------------------------------------------
-	// Step 1: Bootstrap logger so early failures are visible.
+	// Step 1: Bootstrap logger so early failures are visible and
+	//         register Prometheus metrics
 	// -------------------------------------------------------------------
 	bootstrap := buildBootstrapLogger()
 	zap.ReplaceGlobals(bootstrap)
 	zap.L().Info("Step 1 bootstrap logger initialized", zap.String("encoding", "console"), zap.String("level", "info"))
+
+	metrics.RegisterDefaultPrometheus()
+	metrics.MustRegisterMetrics()
 
 	// -------------------------------------------------------------------
 	// Step 2: Load config
@@ -80,10 +185,19 @@ func main() {
 	sugar := zap.S()
 	sugar.Infow("Step 3 complete: logger initialized", "env", cfg.Env, "level", cfg.LogLevel)
 
+	// Log one-shot startup summary (non-secret)
+	logStartupSummary(cfg)
+
 	// -------------------------------------------------------------------
 	// Step 4: Connect to MongoDB
 	// -------------------------------------------------------------------
-	sugar.Infow("Step 4: connecting to MongoDB…", "uri", cfg.MongoURI, "database", cfg.MongoDatabase)
+	redactedMongoURI := redactMongoURI(cfg.MongoURI)
+
+	sugar.Infow("Step 4: connecting to MongoDB…",
+		"uri", redactedMongoURI,
+		"database", cfg.MongoDatabase,
+	)
+
 	client, err := db.Connect(cfg.MongoURI, cfg.MongoDatabase)
 	if err != nil {
 		sugar.Fatalw("MongoDB connection failed", "error", err)
