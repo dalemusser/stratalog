@@ -82,8 +82,8 @@ func TestSessionManager_SessionName(t *testing.T) {
 
 	// Default name
 	sm, _ := NewSessionManager("this-is-a-32-character-long-key!", "", "", time.Hour, false, logger)
-	if sm.SessionName() != "stratasave-session" {
-		t.Errorf("SessionName() = %q, want %q", sm.SessionName(), "stratasave-session")
+	if sm.SessionName() != "stratalog-session" {
+		t.Errorf("SessionName() = %q, want %q", sm.SessionName(), "stratalog-session")
 	}
 
 	// Custom name

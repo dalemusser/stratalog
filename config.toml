@@ -1,12 +1,12 @@
-# Stratasave Local Development Configuration
+# Stratalog Local Development Configuration
 
 # MongoDB
 mongo_uri = "mongodb://localhost:27017"
-mongo_database = "stratasave"
+mongo_database = "stratalog"
 
 # Session (dev key - change for production!)
 session_key = "dev-only-local-development-key-32chars"
-session_name = "stratasave-session"
+session_name = "stratalog-session"
 
 # Admin user seeding (created on first startup)
 seed_admin_email = "dalemusser@gmail.com"
@@ -19,14 +19,14 @@ base_url = "http://localhost:8080"
 mail_smtp_host = "localhost"
 mail_smtp_port = 1025
 mail_from = "noreply@localhost"
-mail_from_name = "Stratasave Dev"
+mail_from_name = "Stratalog Dev"
 
 # File storage (local)
 storage_type = "local"
 storage_local_path = "./uploads"
 storage_local_url = "/files"
 
-# API key for external API access (State API, Settings API)
+# API key for external API access (Log API)
 api_key = "dev-test-api-key-for-local-development"
 
 # Audit logging

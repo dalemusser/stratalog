@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dalemusser/stratasave/internal/app/system/indexes"
+	"github.com/dalemusser/stratalog/internal/app/system/indexes"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -17,7 +17,7 @@ const (
 	// TestDBURI is the MongoDB connection string for tests.
 	TestDBURI = "mongodb://localhost:27017"
 	// TestDBName is the database name used for tests.
-	TestDBName = "stratasave_test"
+	TestDBName = "stratalog_test"
 )
 
 var (
@@ -108,7 +108,7 @@ func sanitizeTestName(name string) string {
 		}
 	}
 	// MongoDB has a 63 character limit for database names.
-	// The prefix "stratasave_test_" is 16 characters, so limit suffix to 47.
+	// The prefix "stratalog_test_" is 15 characters, so limit suffix to 48.
 	const maxLen = 47
 	if len(result) > maxLen {
 		result = result[:maxLen]

@@ -28,7 +28,7 @@ RUN tailwindcss -i ./internal/app/resources/assets/css/src/input.css \
     -o ./internal/app/resources/assets/css/tailwind.css --minify
 
 # Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /app/stratasave ./cmd/stratasave
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /app/stratalog ./cmd/stratalog
 
 # Final stage
 FROM alpine:3.21
@@ -42,7 +42,7 @@ RUN adduser -D -g '' appuser
 WORKDIR /app
 
 # Copy binary from builder
-COPY --from=builder /app/stratasave .
+COPY --from=builder /app/stratalog .
 
 # Copy resources (templates, assets)
 COPY --from=builder /app/internal/app/resources ./internal/app/resources
@@ -61,4 +61,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
 
 # Run the application
-ENTRYPOINT ["./stratasave"]
+ENTRYPOINT ["./stratalog"]

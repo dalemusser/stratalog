@@ -85,7 +85,7 @@
 <script>
 (function() {
     if (typeof BroadcastChannel === 'undefined') return;
-    var channel = new BroadcastChannel('stratasave_auth');
+    var channel = new BroadcastChannel('stratalog_auth');
     channel.onmessage = function(event) {
         if (event.data && event.data.type === 'login_success') {
             window.location.href = event.data.returnURL || '/dashboard';

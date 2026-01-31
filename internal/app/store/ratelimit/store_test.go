@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dalemusser/stratasave/internal/testutil"
+	"github.com/dalemusser/stratalog/internal/testutil"
 )
 
 func TestNew(t *testing.T) {

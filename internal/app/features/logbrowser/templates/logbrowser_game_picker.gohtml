@@ -1,0 +1,44 @@
+{{ define "logbrowser/game_picker" }}
+<div class="fixed inset-0 z-50">
+  <div class="fixed inset-0 bg-black/50" onclick="closeGamePicker()"></div>
+  <div class="fixed inset-0 flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full">
+      <div class="p-4 border-b dark:border-gray-700">
+        <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Select Game</h3>
+        <input type="text"
+               id="game-search"
+               placeholder="Search games..."
+               value="{{ .Query }}"
+               hx-get="/console/api/logs/game-picker?selected={{ .SelectedID }}"
+               hx-target="#game-list"
+               hx-swap="innerHTML"
+               hx-trigger="keyup changed delay:200ms"
+               name="q"
+               class="mt-3 w-full px-3 py-2 text-sm border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded focus:outline-none focus:ring-2 focus:ring-indigo-400">
+      </div>
+      <div id="game-list" class="max-h-64 overflow-auto">
+        {{ template "logbrowser/game_picker_list" . }}
+      </div>
+      <div class="p-4 border-t dark:border-gray-700 flex justify-end gap-3">
+        <button type="button" onclick="closeGamePicker()" class="px-4 py-2 text-sm border dark:border-gray-600 rounded text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">Cancel</button>
+        <button type="button" onclick="confirmGameSelection()" class="px-4 py-2 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700">Select</button>
+      </div>
+    </div>
+  </div>
+</div>
+{{ end }}
+
+{{ define "logbrowser/game_picker_list" }}
+<div class="p-2">
+  {{ if .Games }}
+  {{ range .Games }}
+  <label class="flex items-center gap-2 p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer">
+    <input type="radio" name="game-selection" value="{{ .Name }}" {{ if .Selected }}checked{{ end }} class="text-indigo-600">
+    <span class="text-sm text-gray-900 dark:text-gray-100">{{ .Name }}</span>
+  </label>
+  {{ end }}
+  {{ else }}
+  <p class="p-4 text-sm text-gray-500 dark:text-gray-400">No games found{{ if $.Query }} matching "{{ $.Query }}"{{ end }}.</p>
+  {{ end }}
+</div>
+{{ end }}

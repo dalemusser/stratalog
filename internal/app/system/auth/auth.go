@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dalemusser/stratasave/internal/app/system/normalize"
+	"github.com/dalemusser/stratalog/internal/app/system/normalize"
 	"github.com/gorilla/securecookie"
 	"github.com/gorilla/sessions"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -62,7 +62,7 @@ type SessionManager struct {
 //
 // Parameters:
 //   - sessionKey: signing key for cookies (must be ≥32 chars in production)
-//   - name: session cookie name (defaults to "stratasave-session" if empty)
+//   - name: session cookie name (defaults to "stratalog-session" if empty)
 //   - domain: cookie domain (empty means current host)
 //   - maxAge: session cookie lifetime (e.g., 24*time.Hour)
 //   - secure: if true, cookies are Secure + SameSite=None (for HTTPS production)
@@ -93,7 +93,7 @@ func NewSessionManager(sessionKey, name, domain string, maxAge time.Duration, se
 
 	// Set session name (use default if empty)
 	if name == "" {
-		name = "stratasave-session"
+		name = "stratalog-session"
 	}
 
 	store := sessions.NewCookieStore([]byte(sessionKey))

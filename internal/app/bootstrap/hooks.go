@@ -13,7 +13,7 @@ import (
 // Only LoadConfig, ConnectDB, and BuildHandler are strictly required;
 // the others are optional and may be nil if the app does not need them.
 var Hooks = app.Hooks[AppConfig, DBDeps]{
-	Name:           "stratasave", // used only for logging/diagnostics
+	Name:           "stratalog", // used only for logging/diagnostics
 	LoadConfig:     LoadConfig,    // load core + app config
 	ValidateConfig: ValidateConfig, // validate MongoDB URI and other settings
 	ConnectDB:      ConnectDB,     // connect to MongoDB and return DBDeps

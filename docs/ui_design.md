@@ -1,10 +1,10 @@
 # UI Design Guide
 
-Quick reference for implementing consistent UI layouts in StrataSave features. For comprehensive patterns, see `ui-design-patterns.md`.
+Quick reference for implementing consistent UI layouts in StrataLog features. For comprehensive patterns, see `ui-design-patterns.md`.
 
 ## Page Types
 
-StrataSave features have four main page types:
+StrataLog features have four main page types:
 
 | Page Type | Purpose | Layout |
 |-----------|---------|--------|

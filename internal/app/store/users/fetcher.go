@@ -8,10 +8,10 @@ package userstore
 import (
 	"context"
 
-	"github.com/dalemusser/stratasave/internal/app/system/auth"
-	"github.com/dalemusser/stratasave/internal/app/system/normalize"
-	"github.com/dalemusser/stratasave/internal/app/system/timeouts"
-	"github.com/dalemusser/stratasave/internal/domain/models"
+	"github.com/dalemusser/stratalog/internal/app/system/auth"
+	"github.com/dalemusser/stratalog/internal/app/system/normalize"
+	"github.com/dalemusser/stratalog/internal/app/system/timeouts"
+	"github.com/dalemusser/stratalog/internal/domain/models"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"

@@ -1,8 +1,8 @@
-# CLAUDE.md - Stratasave Project Instructions
+# CLAUDE.md - StrataLog Project Instructions
 
 ## Overview
 
-Stratasave is a Go web application starter/template for building monitor-able services. It provides authentication, user management, settings, and dynamic pages out of the box.
+StrataLog is a game logging service with developer tools (browser, playground, documentation, stats). It provides a production API for game log submission and a developer console for viewing, testing, and managing logs.
 
 ## Key Patterns
 
@@ -34,17 +34,35 @@ Use `viewdata.New(r)` for minimal init or `viewdata.NewBaseVM(r, db, title, back
 - `auth.CurrentUser(r)` returns `(*SessionUser, bool)`
 - `sessionMgr.RequireAuth` middleware for authenticated routes
 - `sessionMgr.RequireRole("admin")` for role-based access
+- API endpoints use Bearer token authentication
 
-## Adding Features
+## Key Features
 
-1. Create `internal/app/features/<name>/<name>.go`
-2. Define Handler, NewHandler, Routes
-3. Mount in `bootstrap/routes.go`
-4. Create templates in `resources/templates/<name>/`
+### Log API
+- POST `/api/log/submit`: Submit single or batch log entries (Bearer token auth)
+- GET `/api/log/list?game=<name>`: Query logs with filters (Bearer token auth)
+- Legacy: POST/GET `/logs` (backward compatible)
+
+### Public Endpoints
+- GET `/logs/view?game=<name>`: HTML view of logs (no auth)
+- GET `/logs/download?game=<name>`: JSON download (no auth)
+
+### Log Browser (`/console/api/logs`)
+- View, search, filter logs by game/player/event type
+- Delete operations (admin only)
+
+### Playground & Documentation
+- Interactive API testing
+- API reference documentation
 
 ## Configuration
 
-Environment variables use `STRATASAVE_` prefix. See `bootstrap/config.go` and `bootstrap/appconfig.go`.
+Environment variables use `STRATALOG_` prefix. See `bootstrap/config.go` and `bootstrap/appconfig.go`.
+
+Key config:
+- `STRATALOG_API_KEY`: Bearer token for API authentication
+- `STRATALOG_MAX_BATCH_SIZE`: Max entries in batch submission (default: 100)
+- `STRATALOG_MAX_BODY_SIZE`: Max request body size (default: 1MB)
 
 ## Common Commands
 

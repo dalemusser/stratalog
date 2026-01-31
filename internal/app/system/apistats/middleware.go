@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dalemusser/stratasave/internal/app/store/apistats"
+	"github.com/dalemusser/stratalog/internal/app/store/apistats"
 	"go.uber.org/zap"
 )
 

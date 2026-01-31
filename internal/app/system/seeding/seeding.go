@@ -4,8 +4,8 @@ package seeding
 import (
 	"context"
 
-	pagestore "github.com/dalemusser/stratasave/internal/app/store/pages"
-	"github.com/dalemusser/stratasave/internal/domain/models"
+	pagestore "github.com/dalemusser/stratalog/internal/app/store/pages"
+	"github.com/dalemusser/stratalog/internal/domain/models"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.uber.org/zap"
 )

@@ -4,7 +4,7 @@ package errors
 import (
 	"net/http"
 
-	"github.com/dalemusser/stratasave/internal/app/system/viewdata"
+	"github.com/dalemusser/stratalog/internal/app/system/viewdata"
 	"github.com/dalemusser/waffle/pantry/templates"
 	"go.uber.org/zap"
 )

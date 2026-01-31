@@ -4,9 +4,9 @@ package logout
 import (
 	"net/http"
 
-	"github.com/dalemusser/stratasave/internal/app/store/sessions"
-	"github.com/dalemusser/stratasave/internal/app/system/auth"
-	"github.com/dalemusser/stratasave/internal/app/system/auditlog"
+	"github.com/dalemusser/stratalog/internal/app/store/sessions"
+	"github.com/dalemusser/stratalog/internal/app/system/auth"
+	"github.com/dalemusser/stratalog/internal/app/system/auditlog"
 	"github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
 )

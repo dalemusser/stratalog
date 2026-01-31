@@ -1,4 +1,4 @@
-# Docker Compose for StrataSave Local Development
+# Docker Compose for StrataLog Local Development
 # Usage:
 #   docker compose up -d          # Start all services
 #   docker compose up -d mongodb  # Start only MongoDB
@@ -12,7 +12,7 @@ services:
   # ==========================================================================
   mongodb:
     image: mongo:7
-    container_name: stratasave-mongodb
+    container_name: stratalog-mongodb
     restart: unless-stopped
     ports:
       - "27017:27017"
@@ -20,7 +20,7 @@ services:
       - mongodb_data:/data/db
     environment:
       # For development, no auth. In production, use MONGO_INITDB_ROOT_USERNAME/PASSWORD
-      MONGO_INITDB_DATABASE: stratasave
+      MONGO_INITDB_DATABASE: stratalog
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 10s
@@ -29,13 +29,13 @@ services:
       start_period: 10s
 
   # ==========================================================================
-  # MailHog - Email Testing (captures all outgoing emails)
+  # Mailpit - Email Testing (captures all outgoing emails)
   # Web UI: http://localhost:8025
   # SMTP: localhost:1025
   # ==========================================================================
-  mailhog:
-    image: mailhog/mailhog:latest
-    container_name: stratasave-mailhog
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: stratalog-mailpit
     restart: unless-stopped
     ports:
       - "1025:1025"   # SMTP server
@@ -44,45 +44,50 @@ services:
       driver: "none"  # Reduce log noise
 
   # ==========================================================================
-  # StrataSave Application
+  # StrataLog Application
   # ==========================================================================
   app:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: stratasave-app
+    container_name: stratalog-app
     restart: unless-stopped
     ports:
       - "8080:8080"
     depends_on:
       mongodb:
         condition: service_healthy
-      mailhog:
+      mailpit:
         condition: service_started
     environment:
       # Runtime
-      STRATASAVE_ENV: dev
-      STRATASAVE_LOG_LEVEL: debug
+      STRATALOG_ENV: dev
+      STRATALOG_LOG_LEVEL: debug
 
       # Database
-      STRATASAVE_MONGO_URI: mongodb://mongodb:27017
-      STRATASAVE_MONGO_DATABASE: stratasave
+      STRATALOG_MONGO_URI: mongodb://mongodb:27017
+      STRATALOG_MONGO_DATABASE: stratalog
 
-      # Email (MailHog)
-      STRATASAVE_MAIL_SMTP_HOST: mailhog
-      STRATASAVE_MAIL_SMTP_PORT: 1025
-      STRATASAVE_MAIL_FROM: noreply@localhost
-      STRATASAVE_MAIL_FROM_NAME: StrataSave
-      STRATASAVE_BASE_URL: http://localhost:8080
+      # Email (Mailpit)
+      STRATALOG_MAIL_SMTP_HOST: mailpit
+      STRATALOG_MAIL_SMTP_PORT: 1025
+      STRATALOG_MAIL_FROM: noreply@localhost
+      STRATALOG_MAIL_FROM_NAME: StrataLog
+      STRATALOG_BASE_URL: http://localhost:8080
 
       # Sessions (dev keys - change in production!)
-      STRATASAVE_SESSION_KEY: docker-dev-session-key-change-in-prod-1234
-      STRATASAVE_CSRF_KEY: docker-dev-csrf-key-change-in-production-1234
+      STRATALOG_SESSION_KEY: docker-dev-session-key-change-in-prod-1234
+      STRATALOG_CSRF_KEY: docker-dev-csrf-key-change-in-production-1234
+
+      # Log API
+      STRATALOG_API_KEY: docker-dev-api-key-for-testing
+      STRATALOG_MAX_BATCH_SIZE: 100
+      STRATALOG_MAX_BODY_SIZE: 1048576
 
       # File storage
-      STRATASAVE_STORAGE_TYPE: local
-      STRATASAVE_STORAGE_LOCAL_PATH: /app/uploads
-      STRATASAVE_STORAGE_LOCAL_URL: /files
+      STRATALOG_STORAGE_TYPE: local
+      STRATALOG_STORAGE_LOCAL_PATH: /app/uploads
+      STRATALOG_STORAGE_LOCAL_URL: /files
     volumes:
       # Persist uploaded files
       - uploads_data:/app/uploads
@@ -95,23 +100,23 @@ services:
 
 volumes:
   mongodb_data:
-    name: stratasave-mongodb-data
+    name: stratalog-mongodb-data
   uploads_data:
-    name: stratasave-uploads
+    name: stratalog-uploads
 
 # ==========================================================================
 # Development Tips:
 # ==========================================================================
 #
-# 1. Run only dependencies (MongoDB + MailHog) for local Go development:
-#    docker compose up -d mongodb mailhog
-#    Then run: go run ./cmd/stratasave
+# 1. Run only dependencies (MongoDB + Mailpit) for local Go development:
+#    docker compose up -d mongodb mailpit
+#    Then run: go run ./cmd/stratalog
 #
 # 2. View captured emails:
 #    Open http://localhost:8025 in your browser
 #
 # 3. Connect to MongoDB:
-#    mongosh mongodb://localhost:27017/stratasave
+#    mongosh mongodb://localhost:27017/stratalog
 #
 # 4. View app logs:
 #    docker compose logs -f app
@@ -122,3 +127,9 @@ volumes:
 # 6. Reset database:
 #    docker compose down -v
 #    docker compose up -d
+#
+# 7. Test Log API:
+#    curl -X POST http://localhost:8080/api/v1/logs \
+#      -H "Authorization: Bearer docker-dev-api-key-for-testing" \
+#      -H "Content-Type: application/json" \
+#      -d '{"game":"test","player_id":"player1","event_type":"login"}'

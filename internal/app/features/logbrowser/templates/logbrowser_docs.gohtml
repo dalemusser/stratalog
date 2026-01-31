@@ -1,0 +1,303 @@
+{{ define "logbrowser/docs" }}
+  {{ template "layout" . }}
+{{ end }}
+
+{{ define "content" }}
+<div class="max-w-4xl mx-auto">
+  <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">📖 Log API Documentation</h1>
+
+  <!-- Authentication -->
+  <section class="bg-white dark:bg-gray-800 rounded shadow p-6 mb-6">
+    <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Authentication</h2>
+    <p class="text-gray-600 dark:text-gray-400 mb-4">All API endpoints require Bearer token authentication. Include your API key in the Authorization header:</p>
+    <pre class="bg-gray-50 dark:bg-gray-900 p-4 rounded text-sm font-mono overflow-x-auto">Authorization: Bearer YOUR_API_KEY</pre>
+  </section>
+
+  <!-- Submit Logs -->
+  <section class="bg-white dark:bg-gray-800 rounded shadow p-6 mb-6">
+    <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Submit Log Entry</h2>
+    <div class="mb-4">
+      <span class="inline-block px-2 py-1 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 text-xs font-semibold rounded">POST</span>
+      <code class="ml-2 text-sm font-mono text-gray-700 dark:text-gray-300">/api/log/submit</code>
+    </div>
+    <div class="mb-4">
+      <span class="text-gray-500 dark:text-gray-400 text-sm">Legacy:</span>
+      <code class="ml-2 text-sm font-mono text-gray-700 dark:text-gray-300">/logs</code>
+    </div>
+
+    <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Single Entry Request</h3>
+    <pre class="bg-gray-50 dark:bg-gray-900 p-4 rounded text-sm font-mono overflow-x-auto mb-4">{
+  "game": "your-game-id",
+  "playerId": "player-id",
+  "eventType": "event-type",
+  "data": {
+    "key1": "value1",
+    "key2": 123
+  }
+}</pre>
+
+    <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Batch Entry Request</h3>
+    <pre class="bg-gray-50 dark:bg-gray-900 p-4 rounded text-sm font-mono overflow-x-auto mb-4">{
+  "game": "your-game-id",
+  "entries": [
+    {"playerId": "player-id", "eventType": "event-type-1", "data": {"key": "value"}},
+    {"playerId": "player-id", "eventType": "event-type-2", "data": {"key": "value"}},
+    {"playerId": "player-id", "eventType": "event-type-3", "data": {"key": "value"}}
+  ]
+}</pre>
+
+    <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Fields</h3>
+    <table class="w-full text-sm mb-4">
+      <thead class="bg-gray-100 dark:bg-gray-700">
+        <tr>
+          <th class="px-4 py-2 text-left text-gray-600 dark:text-gray-400">Field</th>
+          <th class="px-4 py-2 text-left text-gray-600 dark:text-gray-400">Required</th>
+          <th class="px-4 py-2 text-left text-gray-600 dark:text-gray-400">Description</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y dark:divide-gray-700">
+        <tr>
+          <td class="px-4 py-2 font-mono text-gray-900 dark:text-gray-100">game</td>
+          <td class="px-4 py-2 text-green-600 dark:text-green-400">Yes</td>
+          <td class="px-4 py-2 text-gray-600 dark:text-gray-400">Game identifier</td>
+        </tr>
+        <tr>
+          <td class="px-4 py-2 font-mono text-gray-900 dark:text-gray-100">playerId</td>
+          <td class="px-4 py-2 text-gray-500 dark:text-gray-400">No</td>
+          <td class="px-4 py-2 text-gray-600 dark:text-gray-400">Player identifier</td>
+        </tr>
+        <tr>
+          <td class="px-4 py-2 font-mono text-gray-900 dark:text-gray-100">eventType</td>
+          <td class="px-4 py-2 text-gray-500 dark:text-gray-400">No</td>
+          <td class="px-4 py-2 text-gray-600 dark:text-gray-400">Type of event (e.g., level_complete, item_collected)</td>
+        </tr>
+        <tr>
+          <td class="px-4 py-2 font-mono text-gray-900 dark:text-gray-100">timestamp</td>
+          <td class="px-4 py-2 text-gray-500 dark:text-gray-400">No</td>
+          <td class="px-4 py-2 text-gray-600 dark:text-gray-400">Client timestamp <a href="#" onclick="showRFC3339Modal(); return false;" class="text-indigo-600 dark:text-indigo-400 hover:underline">(RFC3339)</a>. Server adds serverTimestamp automatically.</td>
+        </tr>
+        <tr>
+          <td class="px-4 py-2 font-mono text-gray-900 dark:text-gray-100">data</td>
+          <td class="px-4 py-2 text-gray-500 dark:text-gray-400">No</td>
+          <td class="px-4 py-2 text-gray-600 dark:text-gray-400">Object containing custom data payload</td>
+        </tr>
+        <tr>
+          <td class="px-4 py-2 font-mono text-gray-900 dark:text-gray-100">entries</td>
+          <td class="px-4 py-2 text-gray-500 dark:text-gray-400">No</td>
+          <td class="px-4 py-2 text-gray-600 dark:text-gray-400">Array of entries for batch submission (max {{ .MaxBatchSize }})</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Response (201 Created)</h3>
+    <pre class="bg-gray-50 dark:bg-gray-900 p-4 rounded text-sm font-mono overflow-x-auto">{
+  "status": "success",
+  "received_at": "2026-01-29T10:30:00Z"
+}</pre>
+  </section>
+
+  <!-- List Logs -->
+  <section class="bg-white dark:bg-gray-800 rounded shadow p-6 mb-6">
+    <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">List Log Entries</h2>
+    <div class="mb-4">
+      <span class="inline-block px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs font-semibold rounded">GET</span>
+      <code class="ml-2 text-sm font-mono text-gray-700 dark:text-gray-300">/api/log/list?game=your-game-id</code>
+    </div>
+    <div class="mb-4">
+      <span class="text-gray-500 dark:text-gray-400 text-sm">Legacy:</span>
+      <code class="ml-2 text-sm font-mono text-gray-700 dark:text-gray-300">/logs?game=your-game-id</code>
+    </div>
+
+    <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Query Parameters</h3>
+    <table class="w-full text-sm mb-4">
+      <thead class="bg-gray-100 dark:bg-gray-700">
+        <tr>
+          <th class="px-4 py-2 text-left text-gray-600 dark:text-gray-400">Parameter</th>
+          <th class="px-4 py-2 text-left text-gray-600 dark:text-gray-400">Required</th>
+          <th class="px-4 py-2 text-left text-gray-600 dark:text-gray-400">Description</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y dark:divide-gray-700">
+        <tr>
+          <td class="px-4 py-2 font-mono text-gray-900 dark:text-gray-100">game</td>
+          <td class="px-4 py-2 text-green-600 dark:text-green-400">Yes</td>
+          <td class="px-4 py-2 text-gray-600 dark:text-gray-400">Filter by game name</td>
+        </tr>
+        <tr>
+          <td class="px-4 py-2 font-mono text-gray-900 dark:text-gray-100">playerId</td>
+          <td class="px-4 py-2 text-gray-500 dark:text-gray-400">No</td>
+          <td class="px-4 py-2 text-gray-600 dark:text-gray-400">Filter by player ID</td>
+        </tr>
+        <tr>
+          <td class="px-4 py-2 font-mono text-gray-900 dark:text-gray-100">eventType</td>
+          <td class="px-4 py-2 text-gray-500 dark:text-gray-400">No</td>
+          <td class="px-4 py-2 text-gray-600 dark:text-gray-400">Filter by event type</td>
+        </tr>
+        <tr>
+          <td class="px-4 py-2 font-mono text-gray-900 dark:text-gray-100">start_time</td>
+          <td class="px-4 py-2 text-gray-500 dark:text-gray-400">No</td>
+          <td class="px-4 py-2 text-gray-600 dark:text-gray-400">Filter entries after this time <a href="#" onclick="showRFC3339Modal(); return false;" class="text-indigo-600 dark:text-indigo-400 hover:underline">(RFC3339)</a></td>
+        </tr>
+        <tr>
+          <td class="px-4 py-2 font-mono text-gray-900 dark:text-gray-100">end_time</td>
+          <td class="px-4 py-2 text-gray-500 dark:text-gray-400">No</td>
+          <td class="px-4 py-2 text-gray-600 dark:text-gray-400">Filter entries before this time <a href="#" onclick="showRFC3339Modal(); return false;" class="text-indigo-600 dark:text-indigo-400 hover:underline">(RFC3339)</a></td>
+        </tr>
+        <tr>
+          <td class="px-4 py-2 font-mono text-gray-900 dark:text-gray-100">limit</td>
+          <td class="px-4 py-2 text-gray-500 dark:text-gray-400">No</td>
+          <td class="px-4 py-2 text-gray-600 dark:text-gray-400">Max entries to return (default: 100, use 0 for all)</td>
+        </tr>
+        <tr>
+          <td class="px-4 py-2 font-mono text-gray-900 dark:text-gray-100">offset</td>
+          <td class="px-4 py-2 text-gray-500 dark:text-gray-400">No</td>
+          <td class="px-4 py-2 text-gray-600 dark:text-gray-400">Skip this many entries (for pagination)</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Response</h3>
+    <pre class="bg-gray-50 dark:bg-gray-900 p-4 rounded text-sm font-mono overflow-x-auto">{
+  "entries": [
+    {
+      "id": "507f1f77bcf86cd799439011",
+      "game": "your-game-id",
+      "playerId": "player-id",
+      "eventType": "event-type",
+      "serverTimestamp": "2026-01-29T10:30:00Z",
+      "data": {
+        "key1": "value1",
+        "key2": 123
+      }
+    }
+  ],
+  "total": 150,
+  "limit": 100,
+  "offset": 0
+}</pre>
+  </section>
+
+  <!-- Public Endpoints -->
+  <section class="bg-white dark:bg-gray-800 rounded shadow p-6 mb-6">
+    <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Public Endpoints (No Auth Required)</h2>
+
+    <div class="mb-6">
+      <div class="mb-2">
+        <span class="inline-block px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs font-semibold rounded">GET</span>
+        <code class="ml-2 text-sm font-mono text-gray-700 dark:text-gray-300">/logs/view?game=your-game-id</code>
+      </div>
+      <p class="text-gray-600 dark:text-gray-400 text-sm">Returns an HTML page showing recent log entries for the specified game.</p>
+    </div>
+
+    <div>
+      <div class="mb-2">
+        <span class="inline-block px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs font-semibold rounded">GET</span>
+        <code class="ml-2 text-sm font-mono text-gray-700 dark:text-gray-300">/logs/download?game=your-game-id</code>
+      </div>
+      <p class="text-gray-600 dark:text-gray-400 text-sm">Downloads log entries as a JSON file.</p>
+    </div>
+  </section>
+
+  <!-- Error Codes -->
+  <section class="bg-white dark:bg-gray-800 rounded shadow p-6">
+    <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Error Codes</h2>
+    <table class="w-full text-sm">
+      <thead class="bg-gray-100 dark:bg-gray-700">
+        <tr>
+          <th class="px-4 py-2 text-left text-gray-600 dark:text-gray-400">Code</th>
+          <th class="px-4 py-2 text-left text-gray-600 dark:text-gray-400">Description</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y dark:divide-gray-700">
+        <tr>
+          <td class="px-4 py-2 font-mono text-gray-900 dark:text-gray-100">INVALID_JSON</td>
+          <td class="px-4 py-2 text-gray-600 dark:text-gray-400">Request body is not valid JSON</td>
+        </tr>
+        <tr>
+          <td class="px-4 py-2 font-mono text-gray-900 dark:text-gray-100">MISSING_FIELD</td>
+          <td class="px-4 py-2 text-gray-600 dark:text-gray-400">Required field is missing (e.g., game)</td>
+        </tr>
+        <tr>
+          <td class="px-4 py-2 font-mono text-gray-900 dark:text-gray-100">MISSING_PARAM</td>
+          <td class="px-4 py-2 text-gray-600 dark:text-gray-400">Required query parameter is missing</td>
+        </tr>
+        <tr>
+          <td class="px-4 py-2 font-mono text-gray-900 dark:text-gray-100">EMPTY_ENTRIES</td>
+          <td class="px-4 py-2 text-gray-600 dark:text-gray-400">Batch entries array is empty</td>
+        </tr>
+        <tr>
+          <td class="px-4 py-2 font-mono text-gray-900 dark:text-gray-100">BATCH_TOO_LARGE</td>
+          <td class="px-4 py-2 text-gray-600 dark:text-gray-400">Batch exceeds maximum size ({{ .MaxBatchSize }})</td>
+        </tr>
+        <tr>
+          <td class="px-4 py-2 font-mono text-gray-900 dark:text-gray-100">INSERT_FAILED</td>
+          <td class="px-4 py-2 text-gray-600 dark:text-gray-400">Database insert operation failed</td>
+        </tr>
+        <tr>
+          <td class="px-4 py-2 font-mono text-gray-900 dark:text-gray-100">QUERY_FAILED</td>
+          <td class="px-4 py-2 text-gray-600 dark:text-gray-400">Database query operation failed</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+</div>
+
+<!-- RFC3339 Modal -->
+<div id="rfc3339-modal" class="hidden fixed inset-0 z-50">
+  <div class="fixed inset-0 bg-black/50" onclick="closeRFC3339Modal()"></div>
+  <div class="fixed inset-0 flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-lg w-full p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">RFC3339 Date/Time Format</h3>
+        <button type="button" onclick="closeRFC3339Modal()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+      <div class="text-sm text-gray-600 dark:text-gray-400 space-y-4">
+        <p>RFC3339 is a standard format for representing date and time. It is a profile of ISO 8601.</p>
+        <div>
+          <h4 class="font-semibold text-gray-900 dark:text-gray-100 mb-2">Format</h4>
+          <code class="block bg-gray-100 dark:bg-gray-900 p-3 rounded font-mono text-xs">YYYY-MM-DDTHH:MM:SSZ</code>
+          <code class="block bg-gray-100 dark:bg-gray-900 p-3 rounded font-mono text-xs mt-2">YYYY-MM-DDTHH:MM:SS±HH:MM</code>
+        </div>
+        <div>
+          <h4 class="font-semibold text-gray-900 dark:text-gray-100 mb-2">Examples</h4>
+          <ul class="space-y-1 font-mono text-xs">
+            <li><code class="bg-gray-100 dark:bg-gray-900 px-2 py-1 rounded">2026-01-30T14:30:00Z</code> <span class="text-gray-500">(UTC)</span></li>
+            <li><code class="bg-gray-100 dark:bg-gray-900 px-2 py-1 rounded">2026-01-30T09:30:00-05:00</code> <span class="text-gray-500">(EST)</span></li>
+            <li><code class="bg-gray-100 dark:bg-gray-900 px-2 py-1 rounded">2026-01-30T15:30:00+01:00</code> <span class="text-gray-500">(CET)</span></li>
+          </ul>
+        </div>
+        <div>
+          <h4 class="font-semibold text-gray-900 dark:text-gray-100 mb-2">Components</h4>
+          <ul class="space-y-1 text-xs">
+            <li><code class="font-mono">YYYY</code> - Four-digit year</li>
+            <li><code class="font-mono">MM</code> - Two-digit month (01-12)</li>
+            <li><code class="font-mono">DD</code> - Two-digit day (01-31)</li>
+            <li><code class="font-mono">T</code> - Separator between date and time</li>
+            <li><code class="font-mono">HH</code> - Two-digit hour (00-23)</li>
+            <li><code class="font-mono">MM</code> - Two-digit minute (00-59)</li>
+            <li><code class="font-mono">SS</code> - Two-digit second (00-59)</li>
+            <li><code class="font-mono">Z</code> - UTC timezone indicator</li>
+            <li><code class="font-mono">±HH:MM</code> - Timezone offset from UTC</li>
+          </ul>
+        </div>
+      </div>
+      <div class="mt-6 flex justify-end">
+        <button type="button" onclick="closeRFC3339Modal()" class="px-4 py-2 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function showRFC3339Modal() {
+  document.getElementById('rfc3339-modal').classList.remove('hidden');
+}
+function closeRFC3339Modal() {
+  document.getElementById('rfc3339-modal').classList.add('hidden');
+}
+</script>
+{{ end }}

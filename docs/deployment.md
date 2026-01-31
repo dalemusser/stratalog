@@ -1,6 +1,6 @@
-# StrataSave Production Deployment Guide
+# StrataLog Production Deployment Guide
 
-This guide covers deploying StrataSave to a production environment.
+This guide covers deploying StrataLog to a production environment.
 
 ---
 
@@ -26,7 +26,7 @@ Use this checklist before going live:
 
 - [ ] **MongoDB URI**: Use authenticated connection string
   ```
-  mongodb://user:password@host:27017/stratasave?authSource=admin
+  mongodb://user:password@host:27017/stratalog?authSource=admin
   ```
 - [ ] **Connection pooling**: Tune `mongo_max_pool_size` and `mongo_min_pool_size`
 - [ ] **Replica set**: Consider using a replica set for high availability
@@ -80,40 +80,40 @@ Use this checklist before going live:
 
 ## Environment Variables
 
-All configuration can be set via environment variables with the `STRATASAVE_` prefix:
+All configuration can be set via environment variables with the `STRATALOG_` prefix:
 
 ```bash
 # Required for production
-export STRATASAVE_ENV=prod
-export STRATASAVE_SESSION_KEY="your-secure-32-char-session-key-here"
-export STRATASAVE_CSRF_KEY="your-secure-32-char-csrf-key-here"
-export STRATASAVE_MONGO_URI="mongodb://user:pass@host:27017/stratasave"
-export STRATASAVE_BASE_URL="https://yourdomain.com"
+export STRATALOG_ENV=prod
+export STRATALOG_SESSION_KEY="your-secure-32-char-session-key-here"
+export STRATALOG_CSRF_KEY="your-secure-32-char-csrf-key-here"
+export STRATALOG_MONGO_URI="mongodb://user:pass@host:27017/stratalog"
+export STRATALOG_BASE_URL="https://yourdomain.com"
 
 # HTTPS (Let's Encrypt)
-export STRATASAVE_USE_HTTPS=true
-export STRATASAVE_USE_LETS_ENCRYPT=true
-export STRATASAVE_LETS_ENCRYPT_EMAIL="admin@yourdomain.com"
-export STRATASAVE_DOMAIN="yourdomain.com"
+export STRATALOG_USE_HTTPS=true
+export STRATALOG_USE_LETS_ENCRYPT=true
+export STRATALOG_LETS_ENCRYPT_EMAIL="admin@yourdomain.com"
+export STRATALOG_DOMAIN="yourdomain.com"
 
 # Email
-export STRATASAVE_MAIL_SMTP_HOST="smtp.example.com"
-export STRATASAVE_MAIL_SMTP_PORT=587
-export STRATASAVE_MAIL_SMTP_USER="smtp-user"
-export STRATASAVE_MAIL_SMTP_PASS="smtp-password"
-export STRATASAVE_MAIL_FROM="noreply@yourdomain.com"
+export STRATALOG_MAIL_SMTP_HOST="smtp.example.com"
+export STRATALOG_MAIL_SMTP_PORT=587
+export STRATALOG_MAIL_SMTP_USER="smtp-user"
+export STRATALOG_MAIL_SMTP_PASS="smtp-password"
+export STRATALOG_MAIL_FROM="noreply@yourdomain.com"
 
 # Optional: Google OAuth
-export STRATASAVE_GOOGLE_CLIENT_ID="your-client-id"
-export STRATASAVE_GOOGLE_CLIENT_SECRET="your-client-secret"
+export STRATALOG_GOOGLE_CLIENT_ID="your-client-id"
+export STRATALOG_GOOGLE_CLIENT_SECRET="your-client-secret"
 
 # Optional: S3 Storage
-export STRATASAVE_STORAGE_TYPE=s3
-export STRATASAVE_STORAGE_S3_REGION="us-east-1"
-export STRATASAVE_STORAGE_S3_BUCKET="your-bucket"
+export STRATALOG_STORAGE_TYPE=s3
+export STRATALOG_STORAGE_S3_REGION="us-east-1"
+export STRATALOG_STORAGE_S3_BUCKET="your-bucket"
 
 # Optional: Initial admin
-export STRATASAVE_SEED_ADMIN_EMAIL="admin@yourdomain.com"
+export STRATALOG_SEED_ADMIN_EMAIL="admin@yourdomain.com"
 ```
 
 ---
@@ -123,23 +123,23 @@ export STRATASAVE_SEED_ADMIN_EMAIL="admin@yourdomain.com"
 ### Build the Image
 
 ```bash
-docker build -t stratasave:latest .
+docker build -t stratalog:latest .
 ```
 
 ### Run with Docker
 
 ```bash
 docker run -d \
-  --name stratasave \
+  --name stratalog \
   --restart unless-stopped \
   -p 8080:8080 \
-  -e STRATASAVE_ENV=prod \
-  -e STRATASAVE_SESSION_KEY="your-session-key" \
-  -e STRATASAVE_CSRF_KEY="your-csrf-key" \
-  -e STRATASAVE_MONGO_URI="mongodb://host:27017/stratasave" \
-  -e STRATASAVE_BASE_URL="https://yourdomain.com" \
+  -e STRATALOG_ENV=prod \
+  -e STRATALOG_SESSION_KEY="your-session-key" \
+  -e STRATALOG_CSRF_KEY="your-csrf-key" \
+  -e STRATALOG_MONGO_URI="mongodb://host:27017/stratalog" \
+  -e STRATALOG_BASE_URL="https://yourdomain.com" \
   -v /path/to/uploads:/app/uploads \
-  stratasave:latest
+  stratalog:latest
 ```
 
 ### Docker Compose
@@ -148,21 +148,21 @@ docker run -d \
 version: '3.8'
 
 services:
-  stratasave:
+  stratalog:
     build: .
     restart: unless-stopped
     ports:
       - "8080:8080"
     environment:
-      STRATASAVE_ENV: prod
-      STRATASAVE_SESSION_KEY: ${SESSION_KEY}
-      STRATASAVE_CSRF_KEY: ${CSRF_KEY}
-      STRATASAVE_MONGO_URI: mongodb://mongo:27017/stratasave
-      STRATASAVE_BASE_URL: https://yourdomain.com
-      STRATASAVE_MAIL_SMTP_HOST: ${SMTP_HOST}
-      STRATASAVE_MAIL_SMTP_PORT: ${SMTP_PORT}
-      STRATASAVE_MAIL_SMTP_USER: ${SMTP_USER}
-      STRATASAVE_MAIL_SMTP_PASS: ${SMTP_PASS}
+      STRATALOG_ENV: prod
+      STRATALOG_SESSION_KEY: ${SESSION_KEY}
+      STRATALOG_CSRF_KEY: ${CSRF_KEY}
+      STRATALOG_MONGO_URI: mongodb://mongo:27017/stratalog
+      STRATALOG_BASE_URL: https://yourdomain.com
+      STRATALOG_MAIL_SMTP_HOST: ${SMTP_HOST}
+      STRATALOG_MAIL_SMTP_PORT: ${SMTP_PORT}
+      STRATALOG_MAIL_SMTP_USER: ${SMTP_USER}
+      STRATALOG_MAIL_SMTP_PASS: ${SMTP_PASS}
     volumes:
       - uploads:/app/uploads
     depends_on:
@@ -258,9 +258,9 @@ yourdomain.com {
    mongosh
    use admin
    db.createUser({
-     user: "stratasave",
+     user: "stratalog",
      pwd: "secure-password",
-     roles: [{ role: "readWrite", db: "stratasave" }]
+     roles: [{ role: "readWrite", db: "stratalog" }]
    })
    ```
 
@@ -269,7 +269,7 @@ yourdomain.com {
 3. **Configure backups**:
    ```bash
    # Daily backup script
-   mongodump --uri="mongodb://user:pass@host:27017/stratasave" \
+   mongodump --uri="mongodb://user:pass@host:27017/stratalog" \
      --out=/backups/$(date +%Y%m%d)
    ```
 
@@ -354,7 +354,7 @@ Use these for:
 ### Common Issues
 
 **App won't start**
-- Check MongoDB connectivity: `mongosh $STRATASAVE_MONGO_URI`
+- Check MongoDB connectivity: `mongosh $STRATALOG_MONGO_URI`
 - Verify environment variables are set
 - Check logs for configuration errors
 
@@ -378,10 +378,10 @@ Use these for:
 View application logs:
 ```bash
 # Docker
-docker logs stratasave
+docker logs stratalog
 
 # Systemd
-journalctl -u stratasave -f
+journalctl -u stratalog -f
 ```
 
 ---

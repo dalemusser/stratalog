@@ -1,11 +1,11 @@
-# StrataSave Makefile
+# StrataLog Makefile
 
 .PHONY: build build-linux run test clean dev seed-admin tidy css css-watch css-prod setup setup-tailwind
 
 # Build variables
-BINARY_NAME=stratasave
+BINARY_NAME=stratalog
 BUILD_DIR=bin
-CMD_PATH=./cmd/stratasave
+CMD_PATH=./cmd/stratalog
 
 # Build the application
 build:
@@ -25,7 +25,7 @@ dev:
 		air; \
 	else \
 		echo "air not installed, using go run"; \
-		go run ./cmd/stratasave; \
+		go run ./cmd/stratalog; \
 	fi
 
 # Run tests
@@ -52,7 +52,7 @@ seed-admin:
 		echo "Usage: make seed-admin EMAIL=admin@example.com"; \
 		exit 1; \
 	fi
-	./bin/stratasave seed-admin --email=$(EMAIL)
+	./bin/stratalog seed-admin --email=$(EMAIL)
 
 # Format code
 fmt:
@@ -73,11 +73,11 @@ generate:
 
 # Build for production
 build-prod:
-	CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o bin/stratasave ./cmd/stratasave
+	CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o bin/stratalog ./cmd/stratalog
 
 # Docker build (if Dockerfile exists)
 docker-build:
-	docker build -t stratasave:latest .
+	docker build -t stratalog:latest .
 
 # Tailwind CSS variables
 CSS_INPUT  = ./internal/app/resources/assets/css/src/input.css
@@ -131,7 +131,7 @@ setup: setup-tailwind
 
 # Show help
 help:
-	@echo "StrataSave Makefile targets:"
+	@echo "StrataLog Makefile targets:"
 	@echo ""
 	@echo "Build & Run:"
 	@echo "  build       - Build the application"

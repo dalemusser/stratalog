@@ -3,7 +3,7 @@
 <html lang="en" class="h-full">
   <head>
     <meta charset="UTF-8" />
-    <title>{{ if .SiteName }}{{ .SiteName }}{{ else }}StrataForge{{ end }}</title>
+    <title>{{ if .SiteName }}{{ .SiteName }}{{ else }}StrataLog{{ end }}</title>
     <link rel="stylesheet" href="/assets/css/tailwind.css">
     <link rel="stylesheet" href="/assets/css/tiptap.css">
     <script src="/assets/js/htmx.min.js"></script>
@@ -335,33 +335,23 @@
       (function() {
         var path = window.location.pathname;
 
-        // State API submenu
-        if (path.startsWith('/console/api/state')) {
-          var stateSubmenu = document.getElementById('state-api-submenu');
-          var stateArrow = document.querySelector('[onclick*="state-api"] .submenu-arrow');
-          if (stateSubmenu) {
-            stateSubmenu.classList.remove('hidden');
-            if (stateArrow) stateArrow.classList.add('expanded');
-          }
-        }
-
-        // Settings API submenu
-        if (path.startsWith('/console/api/settings')) {
-          var settingsSubmenu = document.getElementById('settings-api-submenu');
-          var settingsArrow = document.querySelector('[onclick*="settings-api"] .submenu-arrow');
-          if (settingsSubmenu) {
-            settingsSubmenu.classList.remove('hidden');
-            if (settingsArrow) settingsArrow.classList.add('expanded');
+        // Log API submenu
+        if (path.startsWith('/console/api/logs') || path.startsWith('/console/api/stats')) {
+          var logSubmenu = document.getElementById('log-api-submenu');
+          var logArrow = document.querySelector('[onclick*="log-api"] .submenu-arrow');
+          if (logSubmenu) {
+            logSubmenu.classList.remove('hidden');
+            if (logArrow) logArrow.classList.add('expanded');
           }
         }
 
         // Restore submenu state from localStorage for other submenus
-        ['state-api', 'settings-api'].forEach(function(id) {
+        ['log-api'].forEach(function(id) {
           var state = localStorage.getItem('submenu-' + id);
           if (state === 'open') {
             var submenu = document.getElementById(id + '-submenu');
             var arrow = document.querySelector('[onclick*="' + id + '"] .submenu-arrow');
-            if (submenu && !path.startsWith('/console/api/' + id.replace('-api', ''))) {
+            if (submenu && !path.startsWith('/console/api/logs') && !path.startsWith('/console/api/stats')) {
               submenu.classList.remove('hidden');
               if (arrow) arrow.classList.add('expanded');
             }

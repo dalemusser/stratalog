@@ -2,7 +2,7 @@
 package apikeysfeature
 
 import (
-	"github.com/dalemusser/stratasave/internal/app/system/auth"
+	"github.com/dalemusser/stratalog/internal/app/system/auth"
 	"github.com/go-chi/chi/v5"
 )
 

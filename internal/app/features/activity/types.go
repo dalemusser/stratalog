@@ -8,8 +8,8 @@ package activity
 import (
 	"time"
 
-	"github.com/dalemusser/stratasave/internal/app/system/timezones"
-	"github.com/dalemusser/stratasave/internal/app/system/viewdata"
+	"github.com/dalemusser/stratalog/internal/app/system/timezones"
+	"github.com/dalemusser/stratalog/internal/app/system/viewdata"
 )
 
 // Status represents a user's online status.

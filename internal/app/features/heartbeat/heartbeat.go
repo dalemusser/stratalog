@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/dalemusser/stratasave/internal/app/store/activity"
-	"github.com/dalemusser/stratasave/internal/app/store/sessions"
-	"github.com/dalemusser/stratasave/internal/app/system/auth"
+	"github.com/dalemusser/stratalog/internal/app/store/activity"
+	"github.com/dalemusser/stratalog/internal/app/store/sessions"
+	"github.com/dalemusser/stratalog/internal/app/system/auth"
 	"github.com/go-chi/chi/v5"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.uber.org/zap"

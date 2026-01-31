@@ -30,7 +30,7 @@ import (
 	"html/template"
 	"net/http"
 
-	"github.com/dalemusser/stratasave/internal/app/system/viewdata"
+	"github.com/dalemusser/stratalog/internal/app/system/viewdata"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 

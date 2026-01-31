@@ -3,7 +3,7 @@ package testutil
 import (
 	"sync"
 
-	"github.com/dalemusser/stratasave/internal/app/resources"
+	"github.com/dalemusser/stratalog/internal/app/resources"
 	"github.com/dalemusser/waffle/pantry/templates"
 	"go.uber.org/zap"
 )

@@ -12,7 +12,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/dalemusser/stratasave/internal/app/system/viewdata"
+	"github.com/dalemusser/stratalog/internal/app/system/viewdata"
 	"github.com/dalemusser/waffle/pantry/query"
 	"github.com/dalemusser/waffle/pantry/templates"
 	"go.mongodb.org/mongo-driver/bson"

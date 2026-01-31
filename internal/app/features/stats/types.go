@@ -2,7 +2,7 @@
 package statsfeature
 
 import (
-	"github.com/dalemusser/stratasave/internal/app/system/viewdata"
+	"github.com/dalemusser/stratalog/internal/app/system/viewdata"
 )
 
 // StatCardVM represents a single statistic card.

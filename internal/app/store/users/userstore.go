@@ -10,9 +10,9 @@ import (
 	"errors"
 	"time"
 
-	"github.com/dalemusser/stratasave/internal/app/system/normalize"
-	"github.com/dalemusser/stratasave/internal/app/system/status"
-	"github.com/dalemusser/stratasave/internal/domain/models"
+	"github.com/dalemusser/stratalog/internal/app/system/normalize"
+	"github.com/dalemusser/stratalog/internal/app/system/status"
+	"github.com/dalemusser/stratalog/internal/domain/models"
 	wafflemongo "github.com/dalemusser/waffle/pantry/mongo"
 	"github.com/dalemusser/waffle/pantry/text"
 	"go.mongodb.org/mongo-driver/bson"

@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dalemusser/stratasave/internal/app/store/announcement"
-	"github.com/dalemusser/stratasave/internal/app/system/auth"
-	"github.com/dalemusser/stratasave/internal/testutil"
+	"github.com/dalemusser/stratalog/internal/app/store/announcement"
+	"github.com/dalemusser/stratalog/internal/app/system/auth"
+	"github.com/dalemusser/stratalog/internal/testutil"
 	"github.com/go-chi/chi/v5"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"

@@ -3,7 +3,7 @@ package home
 import (
 	"testing"
 
-	"github.com/dalemusser/stratasave/internal/testutil"
+	"github.com/dalemusser/stratalog/internal/testutil"
 	"go.uber.org/zap"
 )
 

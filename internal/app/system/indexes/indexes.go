@@ -76,6 +76,9 @@ func EnsureAll(ctx context.Context, db *mongo.Database) error {
 	if err := ensureSavedFilters(ctx, db); err != nil {
 		problems = append(problems, "saved_filters: "+err.Error())
 	}
+	if err := ensureLogdata(ctx, db); err != nil {
+		problems = append(problems, "logdata: "+err.Error())
+	}
 
 	if len(problems) > 0 {
 		return errors.New(strings.Join(problems, "; "))
@@ -754,6 +757,43 @@ func ensureSavedFilters(ctx context.Context, db *mongo.Database) error {
 				{Key: "is_default", Value: -1},
 			},
 			Options: options.Index().SetName("idx_filter_user_feature"),
+		},
+	})
+}
+
+func ensureLogdata(ctx context.Context, db *mongo.Database) error {
+	c := db.Collection("logdata")
+	return ensureIndexSet(ctx, c, []mongo.IndexModel{
+		// Primary query: game + timestamp (newest first)
+		{
+			Keys: bson.D{
+				{Key: "game", Value: 1},
+				{Key: "serverTimestamp", Value: -1},
+			},
+			Options: options.Index().SetName("idx_logdata_game_serverTimestamp"),
+		},
+		// Player queries within a game
+		{
+			Keys: bson.D{
+				{Key: "game", Value: 1},
+				{Key: "playerId", Value: 1},
+			},
+			Options: options.Index().SetName("idx_logdata_game_playerId"),
+		},
+		// Event type queries within a game
+		{
+			Keys: bson.D{
+				{Key: "game", Value: 1},
+				{Key: "eventType", Value: 1},
+			},
+			Options: options.Index().SetName("idx_logdata_game_eventType"),
+		},
+		// Recent logs across all games (for Recent Logs feature)
+		{
+			Keys: bson.D{
+				{Key: "serverTimestamp", Value: -1},
+			},
+			Options: options.Index().SetName("idx_logdata_serverTimestamp"),
 		},
 	})
 }

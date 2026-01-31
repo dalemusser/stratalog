@@ -1,6 +1,6 @@
-# StrataSave Configuration Guide
+# StrataLog Configuration Guide
 
-StrataSave uses a layered configuration system powered by the Waffle framework. Configuration can be provided through config files, environment variables, or command-line flags.
+StrataLog uses a layered configuration system powered by the Waffle framework. Configuration can be provided through config files, environment variables, or command-line flags.
 
 ## Configuration Precedence
 
@@ -21,10 +21,10 @@ Place your config file in the application's working directory:
 
 ## Configuration Sections
 
-StrataSave configuration is divided into two sections:
+StrataLog configuration is divided into two sections:
 
 1. **Waffle Core Configuration** - Framework-level settings (HTTP, TLS, logging, etc.)
-2. **StrataSave Application Configuration** - App-specific settings (MongoDB, sessions, etc.)
+2. **StrataLog Application Configuration** - App-specific settings (MongoDB, sessions, etc.)
 
 ---
 
@@ -91,14 +91,14 @@ StrataSave configuration is divided into two sections:
 
 ---
 
-## StrataSave Application Configuration
+## StrataLog Application Configuration
 
 ### Database Settings
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | `mongo_uri` | string | `"mongodb://localhost:27017"` | MongoDB connection URI |
-| `mongo_database` | string | `"stratasave"` | MongoDB database name |
+| `mongo_database` | string | `"stratalog"` | MongoDB database name |
 | `mongo_max_pool_size` | int | `100` | MongoDB max connection pool size |
 | `mongo_min_pool_size` | int | `10` | MongoDB min connection pool size |
 
@@ -107,7 +107,7 @@ StrataSave configuration is divided into two sections:
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | `session_key` | string | *(dev default)* | Secret key for signing session cookies |
-| `session_name` | string | `"stratasave-session"` | Session cookie name |
+| `session_name` | string | `"stratalog-session"` | Session cookie name |
 | `session_domain` | string | `""` | Session cookie domain (blank = current host) |
 | `session_max_age` | duration | `"24h"` | Session cookie lifetime (e.g., `24h`, `720h`, `30m`) |
 
@@ -115,7 +115,7 @@ StrataSave configuration is divided into two sections:
 
 ### Idle Logout Configuration
 
-StrataSave can automatically log out users who are idle (browser tab open but no interaction). This is useful for security-sensitive deployments where unattended sessions should be terminated.
+StrataLog can automatically log out users who are idle (browser tab open but no interaction). This is useful for security-sensitive deployments where unattended sessions should be terminated.
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
@@ -141,7 +141,7 @@ idle_logout_warning = "2m"
 
 ### Rate Limiting Configuration
 
-StrataSave includes configurable rate limiting to protect against brute force login attacks. Rate limiting is per-login_id (not per-IP), which allows many users from the same IP address (like students in a school) to log in without blocking each other.
+StrataLog includes configurable rate limiting to protect against brute force login attacks. Rate limiting is per-login_id (not per-IP), which allows many users from the same IP address (like students in a school) to log in without blocking each other.
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
@@ -231,7 +231,7 @@ email_verify_expiry = "10m"
 
 ## File Storage Configuration
 
-StrataSave supports two storage backends for uploaded files:
+StrataLog supports two storage backends for uploaded files:
 
 1. **Local storage** - Files stored on the local filesystem and served by the application
 2. **S3/CloudFront** - Files stored in AWS S3 with signed CloudFront URLs for secure delivery
@@ -296,7 +296,7 @@ To enable Google OAuth:
 | `seed_admin_email` | string | `""` | Email of admin user to create on startup |
 | `seed_admin_name` | string | `"Admin"` | Name of admin user to create on startup |
 
-When `seed_admin_email` is set, StrataSave will create an admin user with that email on startup if one doesn't already exist.
+When `seed_admin_email` is set, StrataLog will create an admin user with that email on startup if one doesn't already exist.
 
 ---
 
@@ -323,27 +323,27 @@ Configure which email notifications are sent to users. All notifications are **d
 
 ## Environment Variables
 
-Configuration can be overridden using environment variables. Strata uses the `STRATASAVE_` prefix for all environment variables.
+Configuration can be overridden using environment variables. Strata uses the `STRATALOG_` prefix for all environment variables.
 
 Examples:
 ```bash
-export STRATASAVE_HTTP_PORT=3000
-export STRATASAVE_LOG_LEVEL=debug
-export STRATASAVE_ENV=prod
-export STRATASAVE_MONGO_URI="mongodb://user:pass@dbserver:27017"
-export STRATASAVE_SESSION_KEY="your-production-secret-key"
-export STRATASAVE_SESSION_MAX_AGE=24h
+export STRATALOG_HTTP_PORT=3000
+export STRATALOG_LOG_LEVEL=debug
+export STRATALOG_ENV=prod
+export STRATALOG_MONGO_URI="mongodb://user:pass@dbserver:27017"
+export STRATALOG_SESSION_KEY="your-production-secret-key"
+export STRATALOG_SESSION_MAX_AGE=24h
 
 # Optional: Enable idle logout
-export STRATASAVE_IDLE_LOGOUT_ENABLED=true
-export STRATASAVE_IDLE_LOGOUT_TIMEOUT=30m
-export STRATASAVE_IDLE_LOGOUT_WARNING=5m
+export STRATALOG_IDLE_LOGOUT_ENABLED=true
+export STRATALOG_IDLE_LOGOUT_TIMEOUT=30m
+export STRATALOG_IDLE_LOGOUT_WARNING=5m
 
 # Rate limiting (enabled by default, configure to adjust)
-# export STRATASAVE_RATE_LIMIT_ENABLED=true
-# export STRATASAVE_RATE_LIMIT_LOGIN_ATTEMPTS=5
-# export STRATASAVE_RATE_LIMIT_LOGIN_WINDOW=15m
-# export STRATASAVE_RATE_LIMIT_LOGIN_LOCKOUT=15m
+# export STRATALOG_RATE_LIMIT_ENABLED=true
+# export STRATALOG_RATE_LIMIT_LOGIN_ATTEMPTS=5
+# export STRATALOG_RATE_LIMIT_LOGIN_WINDOW=15m
+# export STRATALOG_RATE_LIMIT_LOGIN_LOCKOUT=15m
 ```
 
 ---
@@ -353,12 +353,12 @@ export STRATASAVE_IDLE_LOGOUT_WARNING=5m
 ### Prerequisites
 
 - MongoDB running on `localhost:27017`
-- Database `stratasave` (will be created automatically)
+- Database `stratalog` (will be created automatically)
 
 ### config.toml
 
 ```toml
-# StrataSave Local Development Configuration
+# StrataLog Local Development Configuration
 # Place this file in the application root directory
 
 # =============================================================================
@@ -401,17 +401,17 @@ enable_compression = true
 compression_level = 5
 
 # =============================================================================
-# StrataSave Application Configuration
+# StrataLog Application Configuration
 # =============================================================================
 
 # MongoDB - local instance
 mongo_uri = "mongodb://localhost:27017"
-mongo_database = "stratasave"
+mongo_database = "stratalog"
 
 # Session Configuration
 # WARNING: Change session_key in production!
 session_key = "dev-only-change-me-please-0123456789ABCDEF"
-session_name = "stratasave-session"
+session_name = "stratalog-session"
 session_domain = ""
 session_max_age = "24h"
 
@@ -433,7 +433,7 @@ storage_local_url = "/files"
 mail_smtp_host = "localhost"
 mail_smtp_port = 1025
 mail_from = "noreply@example.com"
-mail_from_name = "StrataSave"
+mail_from_name = "StrataLog"
 base_url = "http://localhost:8080"
 email_verify_expiry = "10m"
 
@@ -450,8 +450,8 @@ brew services start mongodb-community  # macOS with Homebrew
 # or
 mongod --dbpath /path/to/data          # Manual start
 
-# Run StrataSave
-go run ./cmd/stratasave
+# Run StrataLog
+go run ./cmd/stratalog
 ```
 
 The application will be available at `http://localhost:8080`.
@@ -472,37 +472,37 @@ When deploying to production:
 ### Example Production Environment Variables
 
 ```bash
-# All settings use the STRATASAVE_ prefix
-export STRATASAVE_ENV=prod
-export STRATASAVE_LOG_LEVEL=info
-export STRATASAVE_USE_HTTPS=true
-export STRATASAVE_USE_LETS_ENCRYPT=true
-export STRATASAVE_LETS_ENCRYPT_EMAIL=admin@yourdomain.com
-export STRATASAVE_DOMAIN=yourdomain.com
+# All settings use the STRATALOG_ prefix
+export STRATALOG_ENV=prod
+export STRATALOG_LOG_LEVEL=info
+export STRATALOG_USE_HTTPS=true
+export STRATALOG_USE_LETS_ENCRYPT=true
+export STRATALOG_LETS_ENCRYPT_EMAIL=admin@yourdomain.com
+export STRATALOG_DOMAIN=yourdomain.com
 
-export STRATASAVE_MONGO_URI="mongodb://user:password@mongo.yourdomain.com:27017/stratasave?authSource=admin"
-export STRATASAVE_SESSION_KEY="$(openssl rand -hex 32)"
-export STRATASAVE_SESSION_DOMAIN=".yourdomain.com"
-export STRATASAVE_SESSION_MAX_AGE=24h
-export STRATASAVE_CSRF_KEY="$(openssl rand -hex 32)"
+export STRATALOG_MONGO_URI="mongodb://user:password@mongo.yourdomain.com:27017/stratalog?authSource=admin"
+export STRATALOG_SESSION_KEY="$(openssl rand -hex 32)"
+export STRATALOG_SESSION_DOMAIN=".yourdomain.com"
+export STRATALOG_SESSION_MAX_AGE=24h
+export STRATALOG_CSRF_KEY="$(openssl rand -hex 32)"
 
 # Optional: Enable idle logout for security-sensitive deployments
-# export STRATASAVE_IDLE_LOGOUT_ENABLED=true
-# export STRATASAVE_IDLE_LOGOUT_TIMEOUT=30m
-# export STRATASAVE_IDLE_LOGOUT_WARNING=5m
+# export STRATALOG_IDLE_LOGOUT_ENABLED=true
+# export STRATALOG_IDLE_LOGOUT_TIMEOUT=30m
+# export STRATALOG_IDLE_LOGOUT_WARNING=5m
 
 # Rate limiting (enabled by default, configure to disable or adjust)
-# export STRATASAVE_RATE_LIMIT_ENABLED=true
-# export STRATASAVE_RATE_LIMIT_LOGIN_ATTEMPTS=5
-# export STRATASAVE_RATE_LIMIT_LOGIN_WINDOW=15m
-# export STRATASAVE_RATE_LIMIT_LOGIN_LOCKOUT=15m
+# export STRATALOG_RATE_LIMIT_ENABLED=true
+# export STRATALOG_RATE_LIMIT_LOGIN_ATTEMPTS=5
+# export STRATALOG_RATE_LIMIT_LOGIN_WINDOW=15m
+# export STRATALOG_RATE_LIMIT_LOGIN_LOCKOUT=15m
 
 # Email configuration
-export STRATASAVE_MAIL_SMTP_HOST=email-smtp.us-east-1.amazonaws.com
-export STRATASAVE_MAIL_SMTP_PORT=587
-export STRATASAVE_MAIL_SMTP_USER=your-ses-smtp-user
-export STRATASAVE_MAIL_SMTP_PASS=your-ses-smtp-password
-export STRATASAVE_MAIL_FROM=noreply@yourdomain.com
-export STRATASAVE_MAIL_FROM_NAME="Your App Name"
-export STRATASAVE_BASE_URL=https://yourdomain.com
+export STRATALOG_MAIL_SMTP_HOST=email-smtp.us-east-1.amazonaws.com
+export STRATALOG_MAIL_SMTP_PORT=587
+export STRATALOG_MAIL_SMTP_USER=your-ses-smtp-user
+export STRATALOG_MAIL_SMTP_PASS=your-ses-smtp-password
+export STRATALOG_MAIL_FROM=noreply@yourdomain.com
+export STRATALOG_MAIL_FROM_NAME="Your App Name"
+export STRATALOG_BASE_URL=https://yourdomain.com
 ```

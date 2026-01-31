@@ -5,7 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/dalemusser/stratasave/internal/app/system/auth"
+	"github.com/dalemusser/stratalog/internal/app/system/auth"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 

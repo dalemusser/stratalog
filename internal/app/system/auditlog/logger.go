@@ -10,7 +10,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/dalemusser/stratasave/internal/app/store/audit"
+	"github.com/dalemusser/stratalog/internal/app/store/audit"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.uber.org/zap"
 )

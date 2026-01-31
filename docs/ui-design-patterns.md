@@ -1,6 +1,6 @@
 # UI Design Patterns
 
-This document describes the standard UI design patterns used in StrataSave. Follow these patterns consistently across all features.
+This document describes the standard UI design patterns used in StrataLog. Follow these patterns consistently across all features.
 
 ## Table of Contents
 

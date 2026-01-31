@@ -2,8 +2,8 @@
 package jobsfeature
 
 import (
-	jobstore "github.com/dalemusser/stratasave/internal/app/store/jobs"
-	"github.com/dalemusser/stratasave/internal/app/system/viewdata"
+	jobstore "github.com/dalemusser/stratalog/internal/app/store/jobs"
+	"github.com/dalemusser/stratalog/internal/app/system/viewdata"
 )
 
 // QueueStatsVM is the view model for queue statistics.

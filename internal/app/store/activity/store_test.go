@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dalemusser/stratasave/internal/testutil"
+	"github.com/dalemusser/stratalog/internal/testutil"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 

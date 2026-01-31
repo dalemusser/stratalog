@@ -31,7 +31,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/dalemusser/stratasave/internal/domain/models"
+	"github.com/dalemusser/stratalog/internal/domain/models"
 	"github.com/dalemusser/waffle/pantry/validate"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )

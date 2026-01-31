@@ -1,8 +1,8 @@
-# Stratasave Configuration Example
+# StrataLog Configuration Example
 # Copy this file to config.toml and update values for your environment.
 #
 # Configuration can also be set via:
-#   - Environment variables: STRATASAVE_<KEY> (e.g., STRATASAVE_MONGO_URI)
+#   - Environment variables: STRATALOG_<KEY> (e.g., STRATALOG_MONGO_URI)
 #   - Command-line flags: --<key> (e.g., --mongo_uri)
 #
 # Precedence (highest wins): flags > env vars > config file > defaults
@@ -67,7 +67,7 @@ max_request_body_bytes = 2097152
 mongo_uri = "mongodb://localhost:27017"
 
 # MongoDB database name
-mongo_database = "stratasave"
+mongo_database = "stratalog"
 
 # Connection pool settings
 mongo_max_pool_size = 100
@@ -87,7 +87,7 @@ index_boot_timeout = "120s"
 session_key = "dev-only-change-me-please-0123456789ABCDEF"
 
 # Session cookie name
-session_name = "stratasave-session"
+session_name = "stratalog-session"
 
 # Session cookie domain (blank = current host only)
 # For subdomains, use ".example.com" (with leading dot)
@@ -129,12 +129,23 @@ rate_limit_login_window = "15m"
 rate_limit_login_lockout = "15m"
 
 # =============================================================================
-# API ACCESS
+# LOG API
 # =============================================================================
 
-# API key for external API access (leave empty to disable)
-# When set, allows Bearer token authentication for API endpoints
+# API key for Log API access (Bearer token authentication)
+# Used for POST /logs, GET /logs, POST /api/v1/logs, GET /api/v1/logs
+# Leave empty to disable API access
 api_key = ""
+
+# Maximum number of entries in a batch log submission
+max_batch_size = 100
+
+# Maximum request body size for log submissions in bytes (default: 1MB)
+max_body_size = 1048576
+
+# API statistics bucket duration for aggregating metrics
+# Values: "1m", "15m", "1h", "24h"
+api_stats_bucket = "1h"
 
 # =============================================================================
 # FILE STORAGE
@@ -173,7 +184,7 @@ mail_smtp_pass = ""
 
 # From address for outgoing emails
 mail_from = "noreply@example.com"
-mail_from_name = "Stratasave"
+mail_from_name = "StrataLog"
 
 # Base URL for email links (magic links, password reset, etc.)
 base_url = "http://localhost:8080"

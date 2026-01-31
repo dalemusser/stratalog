@@ -19,93 +19,70 @@
     <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">API Features Overview</h2>
 
     <div class="space-y-6">
-      <!-- States API -->
+      <!-- Log API -->
       <div class="border-l-4 border-blue-500 pl-4">
         <h3 class="font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
-          <span>💾</span> States API
+          <span>📝</span> Log API
         </h3>
         <p class="text-gray-600 dark:text-gray-400 mt-1 mb-3">
-          REST API for saving and loading game state data. Supports multiple save slots per user/game combination with automatic timestamping and metadata.
+          REST API for submitting and querying game log entries. Supports single and batch submissions with flexible schema for any game event data.
         </p>
         <div class="ml-4 space-y-2 text-sm">
           <div class="flex items-start gap-2">
             <span class="text-gray-500">📋</span>
             <div>
               <span class="font-medium text-gray-700 dark:text-gray-300">Browser</span>
-              <span class="text-gray-500 dark:text-gray-400"> — Browse and inspect all saved state documents directly in the database. View JSON data, timestamps, and metadata for debugging.</span>
+              <span class="text-gray-500 dark:text-gray-400"> — Browse and inspect log entries by game, player, and event type. View JSON data, timestamps, and filter results.</span>
             </div>
           </div>
           <div class="flex items-start gap-2">
             <span class="text-gray-500">🧪</span>
             <div>
               <span class="font-medium text-gray-700 dark:text-gray-300">Playground</span>
-              <span class="text-gray-500 dark:text-gray-400"> — Interactive testing environment for making real API requests. Test save and load operations with custom payloads and see actual responses.</span>
+              <span class="text-gray-500 dark:text-gray-400"> — Interactive testing environment for making real API requests. Test log submission and queries with custom payloads.</span>
             </div>
           </div>
           <div class="flex items-start gap-2">
             <span class="text-gray-500">📖</span>
             <div>
               <span class="font-medium text-gray-700 dark:text-gray-300">Documentation</span>
-              <span class="text-gray-500 dark:text-gray-400"> — Complete API reference with endpoint details, request/response schemas, curl examples, and Unity C# integration code.</span>
+              <span class="text-gray-500 dark:text-gray-400"> — Complete API reference with endpoint details, request/response schemas, curl examples, and integration code.</span>
             </div>
           </div>
           <div class="flex items-start gap-2">
             <span class="text-gray-500">📊</span>
             <div>
               <span class="font-medium text-gray-700 dark:text-gray-300">Stats</span>
-              <span class="text-gray-500 dark:text-gray-400"> — View request counts, error rates, and response time metrics filtered specifically for States API operations.</span>
+              <span class="text-gray-500 dark:text-gray-400"> — View request counts, error rates, and response time metrics for Log API operations.</span>
+            </div>
+          </div>
+          <div class="flex items-start gap-2">
+            <span class="text-gray-500">🕐</span>
+            <div>
+              <span class="font-medium text-gray-700 dark:text-gray-300">Recent Logs</span>
+              <span class="text-gray-500 dark:text-gray-400"> — Real-time view of the most recent log entries across all games. Live updates via SSE show new entries as they arrive.</span>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Settings API -->
-      <div class="border-l-4 border-purple-500 pl-4">
-        <h3 class="font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
-          <span>🗂️</span> Settings API
-        </h3>
-        <p class="text-gray-600 dark:text-gray-400 mt-1 mb-3">
-          REST API for storing user preferences and configuration. Unlike States, Settings uses a single document per user/game with upsert behavior.
-        </p>
-        <div class="ml-4 space-y-2 text-sm">
-          <div class="flex items-start gap-2">
-            <span class="text-gray-500">📋</span>
-            <div>
-              <span class="font-medium text-gray-700 dark:text-gray-300">Browser</span>
-              <span class="text-gray-500 dark:text-gray-400"> — Browse and inspect all settings documents. View user preferences, configuration data, and sync status.</span>
-            </div>
-          </div>
-          <div class="flex items-start gap-2">
-            <span class="text-gray-500">🧪</span>
-            <div>
-              <span class="font-medium text-gray-700 dark:text-gray-300">Playground</span>
-              <span class="text-gray-500 dark:text-gray-400"> — Test settings save/load operations interactively. Verify upsert behavior and response formats.</span>
-            </div>
-          </div>
-          <div class="flex items-start gap-2">
-            <span class="text-gray-500">📖</span>
-            <div>
-              <span class="font-medium text-gray-700 dark:text-gray-300">Documentation</span>
-              <span class="text-gray-500 dark:text-gray-400"> — API reference comparing Settings vs States behavior, with curl examples and Unity integration patterns.</span>
-            </div>
-          </div>
-          <div class="flex items-start gap-2">
-            <span class="text-gray-500">📊</span>
-            <div>
-              <span class="font-medium text-gray-700 dark:text-gray-300">Stats</span>
-              <span class="text-gray-500 dark:text-gray-400"> — View request metrics filtered for Settings API operations only.</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Combined API Stats -->
+      <!-- API Stats -->
       <div class="border-l-4 border-green-500 pl-4">
         <h3 class="font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
           <span>📊</span> API Stats
         </h3>
         <p class="text-gray-600 dark:text-gray-400 mt-1">
-          Unified statistics dashboard showing metrics for all API operations. View combined request counts, error rates, and response time charts across both States and Settings APIs. Filter by time range and drill down into specific operation types.
+          Statistics dashboard showing metrics for all API operations. View request counts, error rates, and response time charts. Filter by time range and drill down into specific operation types.
+        </p>
+      </div>
+
+      <!-- Error Ledger -->
+      <div class="border-l-4 border-red-500 pl-4">
+        <h3 class="font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
+          <span>🚨</span> Error Ledger
+        </h3>
+        <p class="text-gray-600 dark:text-gray-400 mt-1">
+          Centralized error tracking for the application. View server-side errors with stack traces, request context, and timestamps. Helps identify and debug issues in production.
         </p>
       </div>
     </div>

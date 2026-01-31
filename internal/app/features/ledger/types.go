@@ -2,9 +2,9 @@
 package ledgerfeature
 
 import (
-	ledgerstore "github.com/dalemusser/stratasave/internal/app/store/ledger"
-	"github.com/dalemusser/stratasave/internal/app/system/timezones"
-	"github.com/dalemusser/stratasave/internal/app/system/viewdata"
+	ledgerstore "github.com/dalemusser/stratalog/internal/app/store/ledger"
+	"github.com/dalemusser/stratalog/internal/app/system/timezones"
+	"github.com/dalemusser/stratalog/internal/app/system/viewdata"
 )
 
 // LedgerEntryVM is the view model for a single ledger entry.

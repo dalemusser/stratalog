@@ -1,7 +1,7 @@
 // internal/app/features/apikeys/types.go
 package apikeysfeature
 
-import "github.com/dalemusser/stratasave/internal/app/system/viewdata"
+import "github.com/dalemusser/stratalog/internal/app/system/viewdata"
 
 // ScopeVM is the view model for an API key scope.
 type ScopeVM struct {

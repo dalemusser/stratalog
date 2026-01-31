@@ -10,14 +10,14 @@ This guide covers setting up AWS S3 and CloudFront for serving Library files wit
 
 ```
 ┌─────────┐     ┌────────────┐     ┌─────────────┐     ┌────────┐
-│  User   │────▶│   StrataSave   │────▶│  CloudFront │────▶│   S3   │
+│  User   │────▶│   StrataLog   │────▶│  CloudFront │────▶│   S3   │
 └─────────┘     └────────────┘     └─────────────┘     └────────┘
                  Generates           Validates          Stores
                  signed URL          signature          files
 ```
 
 1. User requests to view/download a file
-2. StrataSave generates a signed CloudFront URL
+2. StrataLog generates a signed CloudFront URL
 3. User's browser requests the file from CloudFront
 4. CloudFront validates the signature and serves the file from S3
 
@@ -132,7 +132,7 @@ openssl genrsa -out cloudfront-private-key.pem 2048
 openssl rsa -pubout -in cloudfront-private-key.pem -out cloudfront-public-key.pem
 ```
 
-**Important**: Keep `cloudfront-private-key.pem` secure. This file will be used by StrataSave to sign URLs.
+**Important**: Keep `cloudfront-private-key.pem` secure. This file will be used by StrataLog to sign URLs.
 
 ### Upload the Public Key to CloudFront
 
@@ -142,7 +142,7 @@ openssl rsa -pubout -in cloudfront-private-key.pem -out cloudfront-public-key.pe
    - **Name**: e.g., `myapp-library-signing-key`
    - **Key**: Paste the contents of `cloudfront-public-key.pem`
 4. Click **Create public key**
-5. **Copy the Key ID** (e.g., `K2XXXXXXXXXX`) - you'll need this for StrataSave configuration
+5. **Copy the Key ID** (e.g., `K2XXXXXXXXXX`) - you'll need this for StrataLog configuration
 
 ### Create a Key Group
 
@@ -164,23 +164,23 @@ openssl rsa -pubout -in cloudfront-private-key.pem -out cloudfront-public-key.pe
    - **Trusted key groups**: Select your key group
 5. Click **Save changes**
 
-## Step 6: Configure StrataSave
+## Step 6: Configure StrataLog
 
-Set these environment variables for your StrataSave installation:
+Set these environment variables for your StrataLog installation:
 
 ```bash
 # Storage type
-STRATASAVE_STORAGE_TYPE=s3
+STRATALOG_STORAGE_TYPE=s3
 
 # S3 configuration
-STRATASAVE_STORAGE_S3_REGION=us-east-1
-STRATASAVE_STORAGE_S3_BUCKET=myapp-library-files
-STRATASAVE_STORAGE_S3_PREFIX=library/
+STRATALOG_STORAGE_S3_REGION=us-east-1
+STRATALOG_STORAGE_S3_BUCKET=myapp-library-files
+STRATALOG_STORAGE_S3_PREFIX=library/
 
 # CloudFront configuration (signed URLs)
-STRATASAVE_STORAGE_CF_URL=https://d1234567890.cloudfront.net
-STRATASAVE_STORAGE_CF_KEYPAIR_ID=K2XXXXXXXXXX
-STRATASAVE_STORAGE_CF_KEY_PATH=/path/to/cloudfront-private-key.pem
+STRATALOG_STORAGE_CF_URL=https://d1234567890.cloudfront.net
+STRATALOG_STORAGE_CF_KEYPAIR_ID=K2XXXXXXXXXX
+STRATALOG_STORAGE_CF_KEY_PATH=/path/to/cloudfront-private-key.pem
 ```
 
 Replace:
@@ -193,7 +193,7 @@ Replace:
 
 ### AWS Credentials
 
-StrataSave needs AWS credentials to upload files to S3. Use one of these methods:
+StrataLog needs AWS credentials to upload files to S3. Use one of these methods:
 
 **Option A: Environment variables**
 ```bash
@@ -234,7 +234,7 @@ The AWS credentials need these S3 permissions on your bucket:
 
 ## Step 7: Test the Configuration
 
-1. Start StrataSave with the new configuration
+1. Start StrataLog with the new configuration
 2. Log in as an admin
 3. Go to **Library** and upload a test file
 4. Click **View** or **Download** on the file
@@ -255,15 +255,15 @@ https://d1234567890.cloudfront.net/library/2026/01/abc123-document.pdf?Expires=1
 
 ### "Invalid signature" errors
 
-- Verify `STRATASAVE_STORAGE_CF_KEYPAIR_ID` matches the public key ID in CloudFront
-- Ensure the private key file is readable by StrataSave
+- Verify `STRATALOG_STORAGE_CF_KEYPAIR_ID` matches the public key ID in CloudFront
+- Ensure the private key file is readable by StrataLog
 - Check that the public key in CloudFront matches the private key
 
 ### Files upload but can't be viewed
 
 - Wait a few minutes for CloudFront to propagate (new distributions take 5-10 minutes)
 - Check CloudFront distribution status is "Deployed"
-- Verify the S3 prefix in StrataSave matches your setup
+- Verify the S3 prefix in StrataLog matches your setup
 
 ### "SignatureDoesNotMatch" from S3
 
@@ -283,11 +283,11 @@ https://d1234567890.cloudfront.net/library/2026/01/abc123-document.pdf?Expires=1
 If your files don't require restricted access, you can use CloudFront without signing:
 
 ```bash
-STRATASAVE_STORAGE_TYPE=s3
-STRATASAVE_STORAGE_S3_REGION=us-east-1
-STRATASAVE_STORAGE_S3_BUCKET=myapp-library-files
-STRATASAVE_STORAGE_S3_PREFIX=library/
-STRATASAVE_STORAGE_CF_URL=https://d1234567890.cloudfront.net
+STRATALOG_STORAGE_TYPE=s3
+STRATALOG_STORAGE_S3_REGION=us-east-1
+STRATALOG_STORAGE_S3_BUCKET=myapp-library-files
+STRATALOG_STORAGE_S3_PREFIX=library/
+STRATALOG_STORAGE_CF_URL=https://d1234567890.cloudfront.net
 # Don't set CF_KEYPAIR_ID or CF_KEY_PATH
 ```
 

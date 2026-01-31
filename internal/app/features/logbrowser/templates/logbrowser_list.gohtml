@@ -1,0 +1,572 @@
+{{ define "logbrowser/list" }}
+  {{ template "layout" . }}
+{{ end }}
+
+{{ define "content" }}
+<div class="flex flex-col h-full">
+  <!-- Header -->
+  <div class="mb-4 flex items-center">
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">📋 Log Browser</h1>
+    <!-- Timezone selector -->
+    <div class="flex-1 flex justify-center">
+      <select id="tz-select" style="width: 380px;" class="text-sm border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+        {{ range .TimezoneGroups }}
+        <optgroup label="{{ .Region }}">
+          {{ range .Zones }}
+          <option value="{{ .ID }}">{{ .Label }}</option>
+          {{ end }}
+        </optgroup>
+        {{ end }}
+      </select>
+    </div>
+    <div class="flex items-center gap-4">
+      {{ if .SelectedGame }}
+      <button type="button"
+              hx-get="/console/api/logs/game-picker?selected={{ .SelectedGame }}"
+              hx-target="#modal-root"
+              hx-swap="innerHTML"
+              class="px-3 py-2 border dark:border-gray-600 rounded text-sm text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 flex items-center gap-2">
+        <span>{{ .SelectedGame }}</span>
+        <span class="text-gray-400">&#9662;</span>
+      </button>
+      {{ end }}
+    </div>
+  </div>
+
+  {{ if .SelectedGame }}
+  <!-- Filters Row -->
+  <div class="mb-4 flex items-center gap-4">
+    <!-- Event Type Filter -->
+    {{ if .EventTypes }}
+    <select id="event-type-filter"
+            hx-get="/console/api/logs/data"
+            hx-target="#logs-section"
+            hx-swap="innerHTML"
+            hx-include="[name='game'],[name='player'],[name='limit']"
+            name="eventType"
+            class="text-sm border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded px-3 py-2">
+      <option value="">All Events</option>
+      {{ range .EventTypes }}
+      <option value="{{ . }}" {{ if eq . $.SelectedEventType }}selected{{ end }}>{{ . }}</option>
+      {{ end }}
+    </select>
+    {{ end }}
+    <input type="hidden" name="game" value="{{ .SelectedGame }}">
+    <input type="hidden" name="player" value="{{ .SelectedPlayer }}">
+    <input type="hidden" name="limit" value="{{ .LogLimit }}">
+  </div>
+
+  <!-- Players Section -->
+  <section class="bg-white dark:bg-gray-800 rounded shadow mb-4 flex flex-col" style="max-height: 40vh;">
+    <div class="p-3 border-b dark:border-gray-700 flex items-center justify-between gap-4">
+      <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">Players</h2>
+      <form
+        hx-get="/console/api/logs/players?game={{ .SelectedGame }}"
+        hx-target="#players-section"
+        hx-swap="innerHTML"
+        hx-trigger="submit, keyup changed delay:300ms from:#player-search"
+        class="flex gap-2 flex-1 justify-end"
+      >
+        <input
+          id="player-search"
+          name="search"
+          type="text"
+          value="{{ .PlayerSearch }}"
+          placeholder="Search players..."
+          class="px-3 py-1 text-sm border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded focus:outline-none focus:ring-2 focus:ring-indigo-400 flex-1 max-w-md"
+        />
+        <a
+          href="/console/api/logs?game={{ .SelectedGame }}"
+          hx-get="/console/api/logs/players?game={{ .SelectedGame }}"
+          hx-target="#players-section"
+          hx-swap="innerHTML"
+          onclick="document.getElementById('player-search').value = '';"
+          class="px-3 py-1 border dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+        >Clear</a>
+      </form>
+    </div>
+
+    <div id="players-section" class="flex-1 overflow-auto">
+      {{ template "logbrowser/players_content" . }}
+    </div>
+  </section>
+
+  <!-- Logs Section -->
+  <section id="logs-section" class="bg-white dark:bg-gray-800 rounded shadow flex-1 flex flex-col min-h-0">
+    {{ template "logbrowser/logs_content" . }}
+  </section>
+  {{ else }}
+  <div class="bg-white dark:bg-gray-800 rounded shadow p-8 text-center">
+    <p class="text-gray-500 dark:text-gray-400">No games found in the database.</p>
+  </div>
+  {{ end }}
+</div>
+
+<!-- Modal Root -->
+<div id="modal-root"></div>
+
+<!-- Delete Confirmation Modal -->
+<div id="delete-modal" class="hidden fixed inset-0 z-50">
+  <div class="fixed inset-0 bg-black/50" onclick="closeDeleteModal()"></div>
+  <div class="fixed inset-0 flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
+      <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4" id="delete-modal-title">Confirm Delete</h3>
+      <p class="text-gray-600 dark:text-gray-400 mb-6" id="delete-modal-message">Are you sure you want to delete this log?</p>
+      <div id="delete-buttons" class="flex justify-end gap-3">
+        <button type="button" onclick="closeDeleteModal()" class="px-4 py-2 text-sm border dark:border-gray-600 rounded text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">Cancel</button>
+        <button type="button" id="delete-confirm-btn" class="px-4 py-2 text-sm bg-red-600 text-white rounded hover:bg-red-700">Delete</button>
+      </div>
+      <div id="delete-progress" class="hidden flex items-center justify-center gap-3">
+        <svg class="animate-spin h-5 w-5 text-red-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <span class="text-gray-600 dark:text-gray-400">Deleting...</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let pendingDeleteUrl = null;
+
+function showDeleteModal(title, message, url) {
+  document.getElementById('delete-modal-title').textContent = title;
+  document.getElementById('delete-modal-message').textContent = message;
+  pendingDeleteUrl = url;
+  document.getElementById('delete-modal').classList.remove('hidden');
+}
+
+function closeDeleteModal() {
+  document.getElementById('delete-modal').classList.add('hidden');
+  document.getElementById('delete-buttons').classList.remove('hidden');
+  document.getElementById('delete-progress').classList.add('hidden');
+  pendingDeleteUrl = null;
+}
+
+document.getElementById('delete-confirm-btn').addEventListener('click', function() {
+  if (!pendingDeleteUrl) return;
+
+  var csrfToken = document.querySelector('meta[name="csrf-token"]');
+  var isDeleteAll = pendingDeleteUrl.includes('/player/');
+  var url = pendingDeleteUrl;
+
+  // Show progress indicator
+  document.getElementById('delete-buttons').classList.add('hidden');
+  document.getElementById('delete-progress').classList.remove('hidden');
+
+  var headers = {
+    'Content-Type': 'application/x-www-form-urlencoded'
+  };
+  if (csrfToken) {
+    headers['X-CSRF-Token'] = csrfToken.content;
+  }
+
+  fetch(url, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: headers
+  }).then(function(response) {
+    if (!response.ok) {
+      throw new Error('Delete failed: ' + response.status);
+    }
+    closeDeleteModal();
+    if (isDeleteAll) {
+      document.body.dispatchEvent(new CustomEvent('logs-deleted'));
+    } else {
+      document.body.dispatchEvent(new CustomEvent('log-deleted'));
+    }
+  }).catch(function(err) {
+    closeDeleteModal();
+    alert('Failed to delete: ' + err.message);
+  });
+});
+
+function getUrlParam(name) {
+  var params = new URLSearchParams(window.location.search);
+  return params.get(name) || '';
+}
+
+document.body.addEventListener('log-deleted', function() {
+  var game = getUrlParam('game');
+  var player = getUrlParam('player');
+  var limit = getUrlParam('limit') || '{{ .LogLimit }}';
+  if (game) {
+    // Refresh logs list
+    var logsUrl = '/console/api/logs/data?game=' + encodeURIComponent(game) + '&limit=' + limit;
+    if (player) logsUrl += '&player=' + encodeURIComponent(player);
+    fetch(logsUrl, { credentials: 'same-origin' })
+      .then(function(response) {
+        if (!response.ok) throw new Error('Failed to refresh logs');
+        return response.text();
+      })
+      .then(function(html) {
+        document.getElementById('logs-section').innerHTML = html;
+        htmx.process(document.getElementById('logs-section'));
+        // Also apply timezone formatting to the new content
+        var tzSelect = document.getElementById('tz-select');
+        if (tzSelect) {
+          var tz = tzSelect.value;
+          document.querySelectorAll('#logs-section .tz-time').forEach(function(el) {
+            var iso = el.getAttribute('data-datetime');
+            if (!iso) return;
+            var date = new Date(iso);
+            if (isNaN(date.getTime())) return;
+            try {
+              var options = {
+                timeZone: tz,
+                year: 'numeric',
+                month: 'short',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false,
+                timeZoneName: 'short'
+              };
+              var formatted = date.toLocaleString('en-US', options);
+              formatted = formatted.replace(/, (\d{2}:)/, ' $1');
+              el.textContent = formatted;
+            } catch (e) {}
+          });
+        }
+      })
+      .catch(function(err) {
+        console.error('Failed to refresh logs:', err);
+      });
+    // Refresh players list to update counts
+    var searchInput = document.getElementById('player-search');
+    var search = searchInput ? searchInput.value : '';
+    var playersUrl = '/console/api/logs/players?game=' + encodeURIComponent(game);
+    if (search) playersUrl += '&search=' + encodeURIComponent(search);
+    fetch(playersUrl, { credentials: 'same-origin' })
+      .then(function(response) {
+        if (!response.ok) throw new Error('Failed to refresh players');
+        return response.text();
+      })
+      .then(function(html) {
+        document.getElementById('players-section').innerHTML = html;
+        htmx.process(document.getElementById('players-section'));
+      })
+      .catch(function(err) {
+        console.error('Failed to refresh players list:', err);
+      });
+  }
+});
+
+document.body.addEventListener('logs-deleted', function() {
+  var game = getUrlParam('game');
+  if (game) {
+    var searchInput = document.getElementById('player-search');
+    var search = searchInput ? searchInput.value : '';
+    var url = '/console/api/logs/players?game=' + encodeURIComponent(game);
+    if (search) {
+      url += '&search=' + encodeURIComponent(search);
+    }
+    // Refresh players list using fetch
+    fetch(url, { credentials: 'same-origin' })
+      .then(function(response) {
+        if (!response.ok) throw new Error('Failed to refresh players');
+        return response.text();
+      })
+      .then(function(html) {
+        document.getElementById('players-section').innerHTML = html;
+        // Re-process HTMX on the new content
+        htmx.process(document.getElementById('players-section'));
+      })
+      .catch(function(err) {
+        console.error('Failed to refresh players list:', err);
+      });
+    // Clear the logs section
+    document.getElementById('logs-section').innerHTML = '<div class="p-4 border-b dark:border-gray-700"><h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Logs</h2></div><p class="p-4 text-sm text-gray-500 dark:text-gray-400">Select a player to view logs, or view all logs for this game.</p>';
+  }
+});
+
+function closeGamePicker() {
+  document.getElementById('modal-root').innerHTML = '';
+}
+
+function downloadLogData(logId, game, playerId) {
+  var dataEl = document.getElementById('log-data-' + logId);
+  if (!dataEl) return;
+
+  var content = dataEl.textContent;
+  var blob = new Blob([content], { type: 'application/json' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  var filename = 'log-' + game;
+  if (playerId) filename += '-' + playerId;
+  filename += '-' + logId + '.json';
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function downloadPlayerLogs(game, playerId) {
+  var downloadUrl = '/console/api/logs/download?game=' + encodeURIComponent(game) + '&player=' + encodeURIComponent(playerId);
+  fetch(downloadUrl, { credentials: 'same-origin' })
+    .then(function(response) {
+      if (!response.ok) throw new Error('Download failed');
+      var disposition = response.headers.get('Content-Disposition');
+      var filename = 'logs-' + game + '-' + playerId + '.json';
+      if (disposition) {
+        var match = disposition.match(/filename="(.+)"/);
+        if (match) filename = match[1];
+      }
+      return response.blob().then(function(blob) {
+        return { blob: blob, filename: filename };
+      });
+    })
+    .then(function(result) {
+      var url = URL.createObjectURL(result.blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = result.filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    })
+    .catch(function(err) {
+      alert('Failed to download: ' + err.message);
+    });
+}
+
+function confirmGameSelection() {
+  const selected = document.querySelector('input[name="game-selection"]:checked');
+  if (selected) {
+    window.location.href = '/console/api/logs?game=' + encodeURIComponent(selected.value);
+  }
+  closeGamePicker();
+}
+
+// Timezone handling
+(function() {
+  var tzSelect = document.getElementById('tz-select');
+  if (!tzSelect) return;
+
+  var STORAGE_KEY = 'log_browser_timezone';
+  var browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  var storedTz = localStorage.getItem(STORAGE_KEY);
+  var currentTz = storedTz || browserTz;
+
+  function findTimezoneOption(tz) {
+    var options = tzSelect.options;
+    for (var i = 0; i < options.length; i++) {
+      if (options[i].value === tz) return tz;
+    }
+    return 'UTC';
+  }
+
+  var selectedTz = findTimezoneOption(currentTz);
+  tzSelect.value = selectedTz;
+
+  function formatTimestamps(tz) {
+    document.querySelectorAll('.tz-time').forEach(function(el) {
+      var iso = el.getAttribute('data-datetime');
+      if (!iso) return;
+
+      var date = new Date(iso);
+      if (isNaN(date.getTime())) return;
+
+      try {
+        var options = {
+          timeZone: tz,
+          year: 'numeric',
+          month: 'short',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false,
+          timeZoneName: 'short'
+        };
+        var formatted = date.toLocaleString('en-US', options);
+        formatted = formatted.replace(/, (\d{2}:)/, ' $1');
+        el.textContent = formatted;
+      } catch (e) {
+        console.warn('Invalid timezone:', tz, e);
+      }
+    });
+  }
+
+  formatTimestamps(selectedTz);
+
+  tzSelect.addEventListener('change', function() {
+    var tz = tzSelect.value;
+    localStorage.setItem(STORAGE_KEY, tz);
+    formatTimestamps(tz);
+  });
+
+  document.body.addEventListener('htmx:afterSwap', function(evt) {
+    if (evt.detail.target && (evt.detail.target.id === 'logs-section' || evt.detail.target.id === 'content')) {
+      formatTimestamps(tzSelect.value);
+    }
+  });
+})();
+</script>
+{{ end }}
+
+{{ define "logbrowser/players_content" }}
+<div class="flex items-center justify-between mb-1 px-4 pt-3">
+  <span class="text-sm text-gray-600 dark:text-gray-400">
+    {{ if .PlayerTotal }}{{ .PlayerRangeStart }}-{{ .PlayerRangeEnd }} of {{ .PlayerTotal }}{{ else }}0 of 0{{ end }}
+  </span>
+  <div class="flex gap-2">
+    {{ if .PlayerHasPrev }}
+    <a hx-get="/console/api/logs/players?game={{ .SelectedGame }}&search={{ .PlayerSearch }}&page={{ .PlayerPrevPage }}"
+       hx-target="#players-section"
+       hx-swap="innerHTML"
+       class="px-2 py-1 border dark:border-gray-600 rounded text-xs text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">Prev</a>
+    {{ else }}
+    <span class="px-2 py-1 border dark:border-gray-600 rounded text-xs text-gray-400 dark:text-gray-500">Prev</span>
+    {{ end }}
+    {{ if .PlayerHasNext }}
+    <a hx-get="/console/api/logs/players?game={{ .SelectedGame }}&search={{ .PlayerSearch }}&page={{ .PlayerNextPage }}"
+       hx-target="#players-section"
+       hx-swap="innerHTML"
+       class="px-2 py-1 border dark:border-gray-600 rounded text-xs text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">Next</a>
+    {{ else }}
+    <span class="px-2 py-1 border dark:border-gray-600 rounded text-xs text-gray-400 dark:text-gray-500">Next</span>
+    {{ end }}
+  </div>
+</div>
+
+<div class="overflow-auto px-4 pb-3" style="max-height: calc(40vh - 140px);">
+  {{ if .Players }}
+  <table class="min-w-full text-sm">
+    <thead class="bg-gray-100 dark:bg-gray-700 sticky top-0">
+      <tr class="border-b border-gray-300 dark:border-gray-600">
+        <th class="px-4 py-3 text-left text-gray-600 dark:text-gray-400 uppercase text-xs">Player ID</th>
+        <th class="px-4 py-3 text-center text-gray-600 dark:text-gray-400 uppercase text-xs">Logs</th>
+        <th class="px-4 py-3 text-right text-gray-600 dark:text-gray-400 uppercase text-xs">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{ range .Players }}
+      {{ $playerParam := .PlayerID }}{{ if eq .PlayerID "" }}{{ $playerParam = "__empty__" }}{{ end }}
+      <tr hx-get="/console/api/logs/data?game={{ $.SelectedGame }}&player={{ $playerParam }}&limit={{ $.Limit }}"
+          hx-target="#logs-section"
+          hx-swap="innerHTML"
+          hx-push-url="/console/api/logs?game={{ $.SelectedGame }}&player={{ $playerParam }}"
+          class="border-b border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-900/50 cursor-pointer {{ if eq $playerParam $.SelectedPlayer }}bg-indigo-50 dark:bg-indigo-900/20{{ end }}">
+        <td class="px-4 py-3 text-gray-900 dark:text-gray-100">
+          <div class="truncate max-w-md" title="{{ if eq .PlayerID "" }}(no player){{ else }}{{ .PlayerID }}{{ end }}">{{ if eq .PlayerID "" }}<span class="text-gray-400 italic">(no player)</span>{{ else }}{{ .PlayerID }}{{ end }}</div>
+        </td>
+        <td class="px-4 py-3 text-center text-gray-600 dark:text-gray-400">{{ .LogCount }}</td>
+        <td class="px-4 py-3 text-right">
+          <span class="px-2 py-1 bg-indigo-600 text-white rounded text-xs">View</span>
+        </td>
+      </tr>
+      {{ end }}
+    </tbody>
+  </table>
+  {{ else }}
+  <p class="text-sm text-gray-500 dark:text-gray-400 py-4">No players found{{ if .PlayerSearch }} matching "{{ .PlayerSearch }}"{{ end }}.</p>
+  {{ end }}
+</div>
+{{ end }}
+
+{{ define "logbrowser/logs_content" }}
+<div class="p-3 border-b dark:border-gray-700 flex flex-wrap items-center justify-between gap-2">
+  <div class="flex items-center gap-2">
+    <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300">
+      Logs
+      {{ if .SelectedPlayer }}<span class="font-normal text-gray-500 dark:text-gray-400">for {{ if eq .SelectedPlayer "__empty__" }}(no player){{ else }}{{ .SelectedPlayer }}{{ end }}</span>{{ end }}
+    </h2>
+    {{ if and .SelectedPlayer .SelectedGame (gt .LogTotal 0) }}
+    <button type="button" onclick="downloadPlayerLogs('{{ .SelectedGame }}', '{{ .SelectedPlayer }}')" class="hover:opacity-80 transition-opacity" title="Download all logs for this player">
+      <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none">
+        <path d="M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.9 22 6 22H18C19.1 22 20 21.1 20 20V8L14 2Z" fill="#60A5FA"/>
+        <path d="M14 2V8H20L14 2Z" fill="#3B82F6"/>
+        <path d="M12 11V17M12 17L9 14M12 17L15 14" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+    {{ end }}
+  </div>
+  {{ if and .SelectedGame .Logs }}
+  <div class="flex items-center gap-3">
+    {{ if and .SelectedPlayer (gt .LogTotal 0) }}
+    <button type="button"
+            onclick="showDeleteModal('Delete All Logs', 'Are you sure you want to delete all {{ .LogTotal }} logs for this player? This cannot be undone.', '/console/api/logs/{{ .SelectedGame }}/player/{{ .SelectedPlayer }}/delete')"
+            class="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700">
+      Delete All ({{ .LogTotal }})
+    </button>
+    {{ end }}
+    <span class="text-sm text-gray-600 dark:text-gray-400">{{ len .Logs }} of {{ .LogTotal }} shown</span>
+    <div class="flex gap-1">
+      {{ if .HasPrev }}
+      <button hx-get="/console/api/logs/data?game={{ .SelectedGame }}{{ if .SelectedPlayer }}&player={{ .SelectedPlayer }}{{ end }}&before={{ .PrevCursor }}"
+              hx-target="#logs-section"
+              hx-swap="innerHTML"
+              class="px-2 py-1 text-xs border dark:border-gray-600 rounded text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+        Prev
+      </button>
+      {{ else }}
+      <span class="px-2 py-1 text-xs border dark:border-gray-600 rounded text-gray-400 dark:text-gray-500">Prev</span>
+      {{ end }}
+      {{ if .HasNext }}
+      <button hx-get="/console/api/logs/data?game={{ .SelectedGame }}{{ if .SelectedPlayer }}&player={{ .SelectedPlayer }}{{ end }}&after={{ .NextCursor }}"
+              hx-target="#logs-section"
+              hx-swap="innerHTML"
+              class="px-2 py-1 text-xs border dark:border-gray-600 rounded text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+        Next
+      </button>
+      {{ else }}
+      <span class="px-2 py-1 text-xs border dark:border-gray-600 rounded text-gray-400 dark:text-gray-500">Next</span>
+      {{ end }}
+    </div>
+  </div>
+  {{ end }}
+</div>
+
+<div class="flex-1 overflow-auto">
+{{ if .SelectedGame }}
+  {{ if .Logs }}
+  <div class="divide-y dark:divide-gray-700">
+    {{ range $index, $log := .Logs }}
+    <div class="p-3">
+      <div class="flex items-center justify-between mb-2">
+        <div class="text-sm text-gray-600 dark:text-gray-400">
+          {{ if $log.EventType }}<span class="font-semibold text-indigo-600 dark:text-indigo-400">[{{ $log.EventType }}]</span> {{ end }}
+          {{ if $log.PlayerID }}<span class="text-green-600 dark:text-green-400">{{ $log.PlayerID }}</span> - {{ end }}
+          <span class="tz-time" data-datetime="{{ $log.ServerTimestamp.Format "2006-01-02T15:04:05Z" }}">{{ $log.ServerTimestamp.Format "Jan 02, 2006 15:04:05" }} UTC</span>
+        </div>
+        <button type="button"
+                onclick="showDeleteModal('Delete Log', 'Are you sure you want to delete this log entry?', '/console/api/logs/{{ $.SelectedGame }}/{{ $log.ID }}/delete')"
+                class="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700">
+          Delete
+        </button>
+      </div>
+      {{ if $log.Data }}
+      <details class="group">
+        <summary class="flex items-center gap-2 cursor-pointer list-none">
+          <span class="text-xs text-indigo-600 dark:text-indigo-400 hover:underline">
+            <span class="group-open:hidden">Show data</span>
+            <span class="hidden group-open:inline">Hide data</span>
+          </span>
+          <button type="button" onclick="event.stopPropagation(); downloadLogData('{{ $log.ID }}', '{{ $.SelectedGame }}', '{{ $log.PlayerID }}')" class="hover:opacity-80 transition-opacity" title="Download log data">
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none">
+              <path d="M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.9 22 6 22H18C19.1 22 20 21.1 20 20V8L14 2Z" fill="#60A5FA"/>
+              <path d="M14 2V8H20L14 2Z" fill="#3B82F6"/>
+              <path d="M12 11V17M12 17L9 14M12 17L15 14" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </summary>
+        <pre id="log-data-{{ $log.ID }}" class="mt-2 p-3 text-xs bg-gray-50 dark:bg-gray-900 rounded overflow-auto max-h-64 text-gray-800 dark:text-gray-200">{{ $log.Data }}</pre>
+      </details>
+      {{ end }}
+    </div>
+    {{ end }}
+  </div>
+  {{ else }}
+  <p class="p-4 text-sm text-gray-500 dark:text-gray-400">No logs found{{ if .SelectedPlayer }} for this player{{ end }}.</p>
+  {{ end }}
+{{ else }}
+<p class="p-4 text-sm text-gray-500 dark:text-gray-400">Select a game to view logs.</p>
+{{ end }}
+</div>
+{{ end }}

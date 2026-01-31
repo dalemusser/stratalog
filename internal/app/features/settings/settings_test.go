@@ -7,10 +7,10 @@ import (
 	"strings"
 	"testing"
 
-	settingsstore "github.com/dalemusser/stratasave/internal/app/store/settings"
-	"github.com/dalemusser/stratasave/internal/app/system/htmlsanitize"
-	"github.com/dalemusser/stratasave/internal/domain/models"
-	"github.com/dalemusser/stratasave/internal/testutil"
+	settingsstore "github.com/dalemusser/stratalog/internal/app/store/settings"
+	"github.com/dalemusser/stratalog/internal/app/system/htmlsanitize"
+	"github.com/dalemusser/stratalog/internal/domain/models"
+	"github.com/dalemusser/stratalog/internal/testutil"
 	"go.uber.org/zap"
 )
 

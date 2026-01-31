@@ -1,59 +1,173 @@
-# Strata Application Starter - Features & Capabilities
+# StrataLog Features & Capabilities
 
-Strata is a Go web application starter/template that provides authentication, user management, content management, and administrative features out of the box. Built on the Waffle framework with MongoDB, Chi router, HTMX, and Tailwind CSS.
+StrataLog is a game logging service built on the Waffle framework with MongoDB, Chi router, HTMX, and Tailwind CSS. It provides a production API for game log ingestion and a developer console for viewing and managing logs.
 
 ---
 
 ## Table of Contents
 
-1. [Authentication](#authentication)
-2. [User Management](#user-management)
-3. [Content Management](#content-management)
-4. [File Management](#file-management)
-5. [Site Administration](#site-administration)
-6. [Audit & Monitoring](#audit--monitoring)
-7. [Data Layer](#data-layer)
-8. [System Utilities](#system-utilities)
-9. [Frontend Resources](#frontend-resources)
-10. [Configuration](#configuration)
-11. [Extending Strata](#extending-strata)
+1. [Log API](#log-api)
+2. [Log Browser](#log-browser)
+3. [API Playground & Documentation](#api-playground--documentation)
+4. [Authentication](#authentication)
+5. [User Management](#user-management)
+6. [Site Administration](#site-administration)
+7. [Audit & Monitoring](#audit--monitoring)
+8. [Configuration](#configuration)
+
+---
+
+## Log API
+
+The core feature of StrataLog is a REST API for submitting and querying game logs.
+
+### Endpoints
+
+| Endpoint | Method | Auth | Description |
+|----------|--------|------|-------------|
+| `/api/v1/logs` | POST | Bearer | Submit log entries |
+| `/api/v1/logs` | GET | Bearer | Query log entries |
+| `/logs` | POST | Bearer | Legacy submit endpoint |
+| `/logs` | GET | Bearer | Legacy query endpoint |
+| `/logs/view` | GET | None | Public HTML view |
+| `/logs/download` | GET | None | Public JSON download |
+
+### Single Entry Submission
+
+Submit individual log entries with flexible schema:
+
+```json
+{
+  "game": "mygame",
+  "player_id": "player001",
+  "event_type": "level_complete",
+  "level": 5,
+  "score": 1000
+}
+```
+
+### Batch Submission
+
+Submit multiple entries in a single request (up to 100 by default):
+
+```json
+{
+  "game": "mygame",
+  "entries": [
+    {"player_id": "p1", "event_type": "login"},
+    {"player_id": "p1", "event_type": "level_start", "level": 1},
+    {"player_id": "p1", "event_type": "level_complete", "level": 1}
+  ]
+}
+```
+
+### Query Capabilities
+
+- Filter by game (required)
+- Filter by player_id
+- Filter by event_type
+- Filter by time range (start_time, end_time)
+- Pagination with limit/offset
+- Results sorted by timestamp (newest first)
+
+### Data Model
+
+| Field | Description |
+|-------|-------------|
+| `game` | Game identifier (required) |
+| `player_id` | Player identifier (optional) |
+| `event_type` | Event type string (optional) |
+| `timestamp` | Client timestamp (optional) |
+| `serverTimestamp` | Server timestamp (auto) |
+| `data` | Additional fields (flexible schema) |
+
+### Per-Game Collections
+
+Each game's logs are stored in a separate MongoDB collection (`logs_<game>`) for:
+- Better query performance
+- Easier data isolation
+- Independent scaling
+
+---
+
+## Log Browser
+
+A developer console for viewing and managing logs, available at `/console/api/logs`.
+
+### Features
+
+| Feature | Description |
+|---------|-------------|
+| **Game Selector** | Switch between games |
+| **Player Filter** | Filter by player with search |
+| **Event Type Filter** | Filter by event type |
+| **Pagination** | Navigate through log entries |
+| **Expandable Rows** | View full JSON data |
+| **Delete Operations** | Delete individual logs or all logs for a player |
+| **Real-time Updates** | HTMX-powered dynamic loading |
+
+### Access Control
+
+- Requires authentication
+- Admin and Developer roles only
+- Delete operations admin-only in practice
+
+---
+
+## API Playground & Documentation
+
+### Playground (`/console/api/logs/playground`)
+
+Interactive API testing interface:
+
+- Select operation (Submit or List)
+- Configure request parameters
+- Execute requests with live response
+- View cURL equivalent commands
+- API key auto-filled from config
+
+### Documentation (`/console/api/logs/docs`)
+
+Built-in API reference:
+
+- Authentication instructions
+- Request/response formats
+- Field descriptions
+- Error codes
+- Example payloads
 
 ---
 
 ## Authentication
 
-Strata provides a flexible, multi-method authentication system.
+StrataLog provides authentication for console access.
 
 ### Supported Auth Methods
 
 | Method | Description |
 |--------|-------------|
-| **Password** | Traditional email/password authentication with bcrypt hashing |
-| **Email** | Passwordless authentication via one-time codes or magic links |
-| **Google OAuth** | OAuth2 integration with Google accounts |
-| **Trust** | Development-only method for quick login without credentials |
+| **Password** | Email/password with bcrypt hashing |
+| **Email** | Passwordless via one-time codes or magic links |
+| **Google OAuth** | OAuth2 integration |
+| **Trust** | Development-only quick login |
+
+### API Authentication
+
+External API access uses Bearer token authentication:
+
+```
+Authorization: Bearer YOUR_API_KEY
+```
+
+The API key is configured via `STRATALOG_API_KEY` environment variable.
 
 ### Security Features
 
-- **Password Requirements**: Minimum 8 characters, mixed case, special characters
-- **Rate Limiting**: Configurable limits on failed login attempts (default: 5 attempts in 15 minutes, 15-minute lockout)
-- **Session Management**: Secure cookie-based sessions with configurable expiry
-- **CSRF Protection**: Built-in CSRF tokens on all state-changing requests
-- **OAuth State Validation**: Prevents CSRF in OAuth flows
-
-### Password Recovery
-
-- Email-based password reset with secure tokens
-- Configurable token expiry (default: 10 minutes)
-- Single-use tokens
-- Email confirmation after password change
-
-### Session Features
-
-- Device tracking (IP address, User Agent)
-- Active session list in user profile
-- Revoke individual sessions or all except current
-- Idle logout with configurable timeout and warning
+- Session-based authentication for console
+- Configurable session duration
+- CSRF protection on console routes
+- Rate limiting on login attempts
+- Audit logging of auth events
 
 ---
 
@@ -63,92 +177,16 @@ Strata provides a flexible, multi-method authentication system.
 
 | Role | Capabilities |
 |------|--------------|
-| **Admin** | Full system access, user management, settings, audit logs |
-| **User** | Default role with access to dashboard and profile |
+| **Admin** | Full access: user management, settings, all features |
+| **Developer** | Log browser, playground, documentation, statistics |
 
-Additional roles can be added by extending the role constants.
+### Admin Capabilities
 
-### User Attributes
-
-- Full name with case-insensitive search support
-- Login ID (email or username) with case-insensitive matching
-- Optional email address
-- Authentication method
-- Account status (active/disabled)
-- Theme preference (light/dark/system)
-
-### Admin User Management
-
-- Create users with any authentication method
-- Edit user details and roles
-- Enable/disable user accounts
-- Reset passwords to temporary values
-- Delete users
-- Paginated list with search and status filtering
-
----
-
-## Content Management
-
-### Dynamic Pages
-
-Four built-in editable pages:
-
-| Page | Slug | Purpose |
-|------|------|---------|
-| About | `/about` | Company/site information |
-| Contact | `/contact` | Contact information |
-| Terms | `/terms` | Terms of Service |
-| Privacy | `/privacy` | Privacy Policy |
-
-Features:
-- TipTap rich text editor integration
-- HTML sanitization for XSS prevention
-- Admin-only editing
-- Tracks who last updated and when
-
-### Landing Page
-
-- Customizable title and content
-- Rich HTML support with sanitization
-- Editable from site settings
-
-### Footer
-
-- Custom HTML footer content
-- Site-wide display
-- Configurable in settings
-
----
-
-## File Management
-
-A complete document library system with nested folder support.
-
-### Capabilities
-
-| Feature | Description |
-|---------|-------------|
-| **Folder Hierarchy** | Unlimited nesting depth with breadcrumb navigation |
-| **File Upload** | Up to 32MB per file |
-| **File Metadata** | Name, description, size, content type |
-| **Search & Filter** | Filter by content type, search by name |
-| **Sorting** | Sort by name or date |
-| **Inline Viewing** | View images, PDFs, videos, audio in browser |
-| **Download** | Direct file download |
-
-### Storage Backends
-
-- **Local Filesystem**: Default, stores in configurable directory
-- **Amazon S3**: With optional CloudFront CDN integration
-
-Files are stored with unique paths: `files/YYYY/MM/uuid-extension`
-
-### Access Control
-
-- All authenticated users can browse and download
-- Admin-only: create folders, upload files, edit, delete
-- Recursive folder deletion cleans up all contents
+- Create/edit/delete users
+- Assign roles
+- Enable/disable accounts
+- Reset passwords
+- Send invitations
 
 ---
 
@@ -158,397 +196,168 @@ Files are stored with unique paths: `files/YYYY/MM/uuid-extension`
 
 | Setting | Description |
 |---------|-------------|
-| Site Name | Displayed in header and titles |
-| Logo | Upload/remove site logo |
-| Landing Title | Homepage headline |
-| Landing Content | Homepage body content |
-| Footer HTML | Custom footer content |
+| Site Name | Displayed in header |
+| Logo | Upload custom logo |
+| Landing Page | Customize homepage |
+| Footer | Custom footer HTML |
 
 ### Announcements
 
-System-wide announcements displayed to all users.
+System-wide announcements with:
+- Multiple types (info, warning, success, error)
+- Optional scheduling (start/end dates)
+- Dismissible option
+- Admin management interface
 
-| Feature | Description |
-|---------|-------------|
-| Types | Info, Warning, Success, Error |
-| Scheduling | Optional start and end dates |
-| Dismissible | Users can dismiss if enabled |
-| Admin Management | Full CRUD interface |
+### Invitations
 
-### User Invitations
-
-- Admin-generated invitation links
-- Email delivery of invitations
-- 7-day expiry (configurable)
+- Generate invitation links
+- Email delivery
+- Configurable expiry
 - Single-use tokens
-- Direct registration from invitation link
 
 ---
 
 ## Audit & Monitoring
 
+### API Statistics
+
+Track API usage at `/console/api/stats`:
+
+| Metric | Description |
+|--------|-------------|
+| Request Count | Total API requests |
+| Success/Error Rate | Request outcomes |
+| Response Times | Average latency |
+| By Endpoint | Breakdown by operation |
+
+Statistics are aggregated into configurable time buckets.
+
 ### Audit Logging
 
-Comprehensive security event logging with configurable output (database, log file, both, or off).
+Security event tracking:
 
-#### Authentication Events
-
+#### Auth Events
 - Login success/failure
 - Logout
 - Password changes
 - Email verification
-- Password reset requests
 
-#### Admin Action Events
-
-- User create/update/delete
+#### Admin Events
+- User management actions
 - Settings changes
-- File operations
-- Page edits
+- Configuration updates
 
-#### Event Data Captured
+### Request Ledger
 
-- Timestamp
-- Actor (who performed the action)
-- Target user (if applicable)
-- IP address
-- User Agent
-- Success/failure status
-- Additional details
-
-### Activity Tracking
-
-- User activity event logging
-- Page view tracking
-- Session activity monitoring
-
-### System Status
-
-Health check page showing:
-- MongoDB connection status
-- Database name
-- Configuration overview (secrets masked)
-- System health metrics
+API error logging for debugging:
+- Failed requests (status >= 400)
+- Request body preview
+- Error messages
+- Headers captured
 
 ### Health Endpoints
 
-- `/health` - Load balancer health check
-- Returns system status for orchestrators
-
----
-
-## Data Layer
-
-### Database
-
-MongoDB with:
-- Connection pooling (configurable min/max)
-- Indexed fields for performance
-- Case/diacritic-insensitive search fields
-- Transaction support
-
-### Store Packages
-
-| Store | Purpose |
-|-------|---------|
-| `users` | User persistence and queries |
-| `sessions` | Active session tracking |
-| `emailverify` | Email verification tokens |
-| `passwordreset` | Password reset tokens |
-| `ratelimit` | Login attempt tracking |
-| `oauthstate` | OAuth state validation |
-| `pages` | Dynamic page content |
-| `settings` | Site configuration |
-| `file` | File metadata |
-| `folder` | Folder hierarchy |
-| `announcement` | Announcements |
-| `audit` | Audit event log |
-| `activity` | User activity events |
-| `invitation` | User invitations |
-| `logins` | Login history |
-
----
-
-## System Utilities
-
-### Authentication & Authorization
-
-| Package | Purpose |
-|---------|---------|
-| `auth` | Session management, middleware |
-| `authutil` | Password hashing and validation |
-| `authz` | Role-based access control |
-
-### Security
-
-| Package | Purpose |
-|---------|---------|
-| `htmlsanitize` | XSS prevention for user HTML |
-| `apicors` | CORS middleware for APIs |
-
-### Data Processing
-
-| Package | Purpose |
-|---------|---------|
-| `inputval` | Input validation rules |
-| `normalize` | Data normalization (emails, names) |
-| `jsonutil` | JSON response helpers |
-
-### Communication
-
-| Package | Purpose |
-|---------|---------|
-| `mailer` | SMTP email delivery |
-| `network` | IP extraction, proxy awareness |
-
-### Infrastructure
-
-| Package | Purpose |
-|---------|---------|
-| `viewdata` | Template context building |
-| `indexes` | Database index management |
-| `tasks` | Background job scheduling |
-| `timezones` | Timezone handling |
-| `timeouts` | Request timeout management |
-| `txn` | MongoDB transaction helpers |
-| `seeding` | Database seed data |
-
----
-
-## Frontend Resources
-
-### Templates
-
-Templates organized by feature in `resources/templates/`:
-
-```
-templates/
-├── layouts/          # Base layouts
-├── home/            # Landing page
-├── login/           # Auth forms
-├── dashboard/       # Dashboards
-├── profile/         # User profile
-├── systemusers/     # User management
-├── pages/           # Page editor
-├── settings/        # Site settings
-├── files/           # File browser
-├── announcements/   # Announcements
-├── invitations/     # Invitations
-├── auditlog/        # Audit viewer
-├── activity/        # Activity dashboard
-├── errors/          # Error pages
-└── status/          # System status
-```
-
-### Assets
-
-- **CSS**: Tailwind CSS with custom configuration
-- **JavaScript**: HTMX integration, theme switching, modals
-
-### UI Features
-
-- Dark mode support with user preference
-- HTMX for dynamic updates without page reloads
-- Modal dialogs for confirmations and forms
-- Pagination with configurable page sizes
-- Flash messages for feedback
-- Breadcrumb navigation
+| Endpoint | Purpose |
+|----------|---------|
+| `/health` | Load balancer health check |
+| `/healthz` | Kubernetes liveness probe |
+| `/readyz` | Kubernetes readiness probe |
 
 ---
 
 ## Configuration
 
-Configuration via environment variables with `STRATA_` prefix.
+Configuration via environment variables (`STRATALOG_` prefix) or config file.
+
+### Log API Settings
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `api_key` | (none) | Bearer token for API auth |
+| `max_batch_size` | 100 | Max entries per batch |
+| `max_body_size` | 1MB | Max request body size |
+| `api_stats_bucket` | 1h | Stats aggregation interval |
 
 ### Database
 
-| Variable | Description |
-|----------|-------------|
-| `mongo_uri` | MongoDB connection string |
-| `mongo_database` | Database name |
-| `mongo_max_pool_size` | Maximum connections |
-| `mongo_min_pool_size` | Minimum connections |
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `mongo_uri` | localhost:27017 | MongoDB connection |
+| `mongo_database` | stratalog | Database name |
+| `mongo_max_pool_size` | 100 | Max connections |
 
 ### Sessions
 
-| Variable | Description |
-|----------|-------------|
-| `session_key` | Encryption key (32+ chars) |
-| `session_name` | Cookie name |
-| `session_domain` | Cookie domain |
-| `session_max_age` | Session duration |
-
-### Idle Logout
-
-| Variable | Description |
-|----------|-------------|
-| `idle_logout_enabled` | Enable/disable |
-| `idle_logout_timeout` | Timeout duration |
-| `idle_logout_warning` | Warning before logout |
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `session_key` | (dev key) | Signing key (32+ chars) |
+| `session_name` | stratalog-session | Cookie name |
+| `session_max_age` | 24h | Session duration |
 
 ### Rate Limiting
 
-| Variable | Description |
-|----------|-------------|
-| `rate_limit_enabled` | Enable/disable |
-| `rate_limit_login_attempts` | Max attempts |
-| `rate_limit_login_window` | Time window |
-| `rate_limit_login_lockout` | Lockout duration |
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `rate_limit_enabled` | true | Enable/disable |
+| `rate_limit_login_attempts` | 5 | Max failed attempts |
+| `rate_limit_login_window` | 15m | Time window |
+| `rate_limit_login_lockout` | 15m | Lockout duration |
 
 ### Storage
 
-| Variable | Description |
-|----------|-------------|
-| `storage_type` | `local` or `s3` |
-| `storage_local_path` | Local storage directory |
-| `storage_local_url` | URL prefix for local files |
-| `storage_s3_region` | AWS region |
-| `storage_s3_bucket` | S3 bucket name |
-| `storage_s3_prefix` | Key prefix |
-| `storage_cf_url` | CloudFront distribution URL |
-| `storage_cf_keypair_id` | CloudFront key pair ID |
-| `storage_cf_key_path` | CloudFront private key path |
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `storage_type` | local | `local` or `s3` |
+| `storage_local_path` | ./uploads | Upload directory |
+| `storage_local_url` | /files | URL prefix |
 
 ### Email
 
-| Variable | Description |
-|----------|-------------|
-| `mail_smtp_host` | SMTP server hostname |
-| `mail_smtp_port` | SMTP port |
-| `mail_smtp_user` | SMTP username |
-| `mail_smtp_pass` | SMTP password |
-| `mail_from` | From email address |
-| `mail_from_name` | From display name |
-
-### OAuth
-
-| Variable | Description |
-|----------|-------------|
-| `google_client_id` | Google OAuth client ID |
-| `google_client_secret` | Google OAuth client secret |
-
-### Audit
-
-| Variable | Description |
-|----------|-------------|
-| `audit_log_auth` | Auth event output (db/log/both/off) |
-| `audit_log_admin` | Admin event output |
-
-### Seeding
-
-| Variable | Description |
-|----------|-------------|
-| `seed_admin_email` | Initial admin email |
-| `seed_admin_name` | Initial admin name |
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `mail_smtp_host` | localhost | SMTP server |
+| `mail_smtp_port` | 1025 | SMTP port |
+| `mail_from` | noreply@example.com | From address |
+| `mail_from_name` | StrataLog | From name |
 
 ---
 
-## Extending Strata
+## Architecture
 
-### Adding a New Feature
+### Technology Stack
 
-1. Create package: `internal/app/features/<feature>/`
-2. Define Handler struct:
-   ```go
-   type Handler struct {
-       db     *mongo.Database
-       store  *<feature>store.Store
-       // other dependencies
-   }
+- **Go** - Backend language
+- **Chi** - HTTP router
+- **MongoDB** - Database
+- **HTMX** - Dynamic UI updates
+- **Tailwind CSS** - Styling
+- **Waffle** - Framework (config, templates, utilities)
 
-   func NewHandler(db *mongo.Database) *Handler {
-       return &Handler{db: db, store: <feature>store.New(db)}
-   }
-   ```
+### Package Structure
 
-3. Define routes:
-   ```go
-   func (h *Handler) Routes() http.Handler {
-       r := chi.NewRouter()
-       r.Get("/", h.list)
-       r.Post("/", h.create)
-       // ...
-       return r
-   }
-   ```
-
-4. Mount in `bootstrap/routes.go`:
-   ```go
-   r.Mount("/<feature>", features.<feature>.NewHandler(db).Routes())
-   ```
-
-5. Create templates in `resources/templates/<feature>/`
-
-### Adding a New Store
-
-1. Create package: `internal/app/store/<entity>/`
-2. Define store struct and model:
-   ```go
-   type Store struct {
-       c *mongo.Collection
-   }
-
-   func New(db *mongo.Database) *Store {
-       return &Store{c: db.Collection("<collection>")}
-   }
-   ```
-
-3. Implement CRUD methods with `context.Context` as first parameter
-4. Add indexes in `system/indexes/indexes.go`
-
-### Adding a New Role
-
-1. Add constant in domain models
-2. Update validation in `normalize` package
-3. Create role-specific dashboard template
-4. Add middleware checks where needed:
-   ```go
-   r.With(sessionMgr.RequireRole("newrole")).Get("/path", handler)
-   ```
-
-### Adding a New Auth Method
-
-1. Add to `AllAuthMethods` in domain models
-2. Create feature handler for auth flow
-3. Add login template
-4. Update login logic to handle new method
-5. Mount routes in bootstrap
-
----
-
-## Waffle Framework
-
-Strata is built on the custom Waffle framework which provides:
-
-| Package | Capability |
-|---------|------------|
-| `waffle/config` | Environment, file, and flag configuration |
-| `waffle/middleware` | CORS, timeouts, logging middleware |
-| `waffle/pantry/templates` | HTML templating with hot reload |
-| `waffle/pantry/storage` | Pluggable file storage (local/S3) |
-| `waffle/pantry/mongo` | MongoDB utilities |
-| `waffle/pantry/text` | Text utilities (case folding) |
-| `waffle/pantry/fileserver` | Static file serving |
-| `waffle/pantry/query` | Query parameter parsing |
-| `waffle/pantry/urlutil` | URL utilities |
-| `waffle/pantry/testing` | Test utilities |
-
----
-
-## Quick Start
-
-1. Copy Strata as your starting point
-2. Configure environment variables (see Configuration)
-3. Run `make build` to build
-4. Run `make run` to start
-5. Access at `http://localhost:8080`
-6. Login with seeded admin account or create via invitation
-
-### Development Commands
-
-```bash
-make build    # Build the application
-make run      # Build and run
-make test     # Run tests
-make dev      # Run with hot reload
 ```
+internal/app/
+├── features/
+│   ├── logapi/         # REST API handlers
+│   ├── logbrowser/     # Console UI handlers
+│   ├── apistats/       # Statistics feature
+│   └── ...             # Other features
+├── store/
+│   └── apistats/       # Statistics storage
+├── system/
+│   ├── auth/           # Authentication
+│   ├── apistats/       # Stats middleware
+│   └── ...             # Other utilities
+└── bootstrap/
+    ├── config.go       # Configuration
+    └── routes.go       # Route mounting
+```
+
+### Request Flow
+
+1. Request received by Chi router
+2. Global middleware applied (CORS, security headers, session)
+3. Route-specific middleware (auth, CSRF, stats recording)
+4. Handler processes request
+5. Response returned (JSON for API, HTML for console)

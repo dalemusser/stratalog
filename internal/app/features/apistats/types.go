@@ -4,9 +4,9 @@ package apistats
 import (
 	"time"
 
-	"github.com/dalemusser/stratasave/internal/app/store/apistats"
-	"github.com/dalemusser/stratasave/internal/app/system/timezones"
-	"github.com/dalemusser/stratasave/internal/app/system/viewdata"
+	"github.com/dalemusser/stratalog/internal/app/store/apistats"
+	"github.com/dalemusser/stratalog/internal/app/system/timezones"
+	"github.com/dalemusser/stratalog/internal/app/system/viewdata"
 )
 
 // ListVM is the view model for the main API stats page.
@@ -25,17 +25,15 @@ type ListVM struct {
 	EndTime   time.Time
 	TimeRange string // "1h", "24h", "7d", "30d"
 
-	// API filter: "", "state", or "settings"
+	// API filter: "", "log", etc.
 	APIFilter string
 
 	// Summary statistics
 	Summaries []SummaryVM
 
-	// Time series data for charts
-	StateSaveData    []DataPointVM
-	StateLoadData    []DataPointVM
-	SettingsSaveData []DataPointVM
-	SettingsLoadData []DataPointVM
+	// Time series data for charts (Log API)
+	LogSubmitData []DataPointVM
+	LogListData   []DataPointVM
 
 	// Data resolutions present in the range
 	DataResolutions []string
@@ -108,14 +106,10 @@ func TimeRangeOptions() []struct {
 // StatTypeLabel returns a human-readable label for a stat type.
 func StatTypeLabel(st apistats.StatType) string {
 	switch st {
-	case apistats.StatTypeSaveState:
-		return "Save State"
-	case apistats.StatTypeLoadState:
-		return "Load State"
-	case apistats.StatTypeSaveSettings:
-		return "Save Settings"
-	case apistats.StatTypeLoadSettings:
-		return "Load Settings"
+	case apistats.StatTypeLogSubmit:
+		return "Log Submit"
+	case apistats.StatTypeLogList:
+		return "Log List"
 	default:
 		return string(st)
 	}

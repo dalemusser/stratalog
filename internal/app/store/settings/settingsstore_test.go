@@ -3,8 +3,8 @@ package settingsstore
 import (
 	"testing"
 
-	"github.com/dalemusser/stratasave/internal/domain/models"
-	"github.com/dalemusser/stratasave/internal/testutil"
+	"github.com/dalemusser/stratalog/internal/domain/models"
+	"github.com/dalemusser/stratalog/internal/testutil"
 )
 
 func TestStore_Get_DefaultSettings(t *testing.T) {

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dalemusser/stratasave/internal/domain/models"
+	"github.com/dalemusser/stratalog/internal/domain/models"
 	"github.com/dalemusser/waffle/pantry/text"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"

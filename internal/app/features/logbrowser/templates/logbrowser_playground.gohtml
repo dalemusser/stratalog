@@ -1,0 +1,322 @@
+{{ define "logbrowser/playground" }}
+  {{ template "layout" . }}
+{{ end }}
+
+{{ define "content" }}
+<div class="flex flex-col h-full">
+  <!-- Header -->
+  <div class="mb-4 flex items-center justify-between">
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">🧪 Log API Playground</h1>
+  </div>
+
+  <!-- Main Content - Split View -->
+  <div class="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 min-h-0">
+    <!-- Request Panel -->
+    <div class="bg-white dark:bg-gray-800 rounded shadow flex flex-col">
+      <div class="p-3 border-b dark:border-gray-700">
+        <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Request</h2>
+      </div>
+      <div class="p-4 flex-1 overflow-auto">
+        <form id="playground-form" onsubmit="executeRequest(event)">
+          <!-- Operation Selector -->
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Operation</label>
+            <div class="flex gap-2">
+              <label class="flex items-center gap-2 px-4 py-2 border dark:border-gray-600 rounded cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700">
+                <input type="radio" name="operation" value="submit" checked class="text-indigo-600">
+                <span class="text-sm text-gray-700 dark:text-gray-300">Submit Log</span>
+              </label>
+              <label class="flex items-center gap-2 px-4 py-2 border dark:border-gray-600 rounded cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700">
+                <input type="radio" name="operation" value="list" class="text-indigo-600">
+                <span class="text-sm text-gray-700 dark:text-gray-300">List Logs</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Endpoint Display -->
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Endpoint</label>
+            <code id="endpoint-display" class="inline-block font-mono bg-gray-800 dark:bg-gray-900 px-3 py-1.5 rounded text-sm text-gray-100">/api/log/submit</code>
+          </div>
+
+          <!-- Legacy Endpoint Display -->
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Legacy Endpoint</label>
+            <code id="legacy-endpoint-display" class="inline-block font-mono bg-gray-800 dark:bg-gray-900 px-3 py-1.5 rounded text-sm text-gray-100">/logs</code>
+          </div>
+
+          <!-- API Key Display -->
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">API Key</label>
+            <div class="flex items-center gap-2">
+              <code id="apikey-masked" class="font-mono bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-sm text-gray-500 dark:text-gray-400">{{ if .APIKey }}********************************{{ else }}(not configured){{ end }}</code>
+              <code id="apikey-visible" class="hidden font-mono bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-sm text-gray-500 dark:text-gray-400">{{ .APIKey }}</code>
+              {{ if .APIKey }}
+              <button type="button" onclick="toggleApiKey()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" title="Show/Hide API Key">
+                <svg id="apikey-show-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                </svg>
+                <svg id="apikey-hide-icon" class="hidden w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>
+                </svg>
+              </button>
+              {{ end }}
+            </div>
+          </div>
+
+          <!-- Game -->
+          <div class="mb-4">
+            <label for="game" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Game</label>
+            <input type="text" id="game" name="game" placeholder="Enter game ID" required
+                   class="w-full px-3 py-2 text-sm border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded focus:outline-none focus:ring-2 focus:ring-indigo-400">
+          </div>
+
+          <!-- Submit fields -->
+          <div id="submit-fields">
+            <!-- Player ID -->
+            <div class="mb-4">
+              <label for="playerId" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Player ID</label>
+              <input type="text" id="playerId" name="playerId" placeholder="Enter player ID"
+                     class="w-full px-3 py-2 text-sm border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded focus:outline-none focus:ring-2 focus:ring-indigo-400">
+            </div>
+
+            <!-- Event Type -->
+            <div class="mb-4">
+              <label for="eventType" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Event Type</label>
+              <input type="text" id="eventType" name="eventType" placeholder="Enter event type"
+                     class="w-full px-3 py-2 text-sm border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded focus:outline-none focus:ring-2 focus:ring-indigo-400">
+            </div>
+
+            <!-- Data -->
+            <div class="mb-4">
+              <label for="data" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Data (JSON)</label>
+              <textarea id="data" name="data" rows="5" placeholder='{"key": "value"}'
+                        class="w-full px-3 py-2 text-sm font-mono border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded focus:outline-none focus:ring-2 focus:ring-indigo-400"></textarea>
+            </div>
+          </div>
+
+          <!-- List fields -->
+          <div id="list-fields" class="hidden">
+            <!-- Player ID Filter -->
+            <div class="mb-4">
+              <label for="filter_playerId" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Player ID (optional)</label>
+              <input type="text" id="filter_playerId" name="filter_playerId" placeholder="Filter by player"
+                     class="w-full px-3 py-2 text-sm border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded focus:outline-none focus:ring-2 focus:ring-indigo-400">
+            </div>
+
+            <!-- Event Type Filter -->
+            <div class="mb-4">
+              <label for="filter_eventType" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Event Type (optional)</label>
+              <input type="text" id="filter_eventType" name="filter_eventType" placeholder="Filter by event type"
+                     class="w-full px-3 py-2 text-sm border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded focus:outline-none focus:ring-2 focus:ring-indigo-400">
+            </div>
+
+            <!-- Limit -->
+            <div class="mb-4">
+              <label for="limit" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Limit</label>
+              <div class="flex items-center gap-3">
+                <input type="number" id="limit" name="limit" value="100" min="0"
+                       class="flex-1 px-3 py-2 text-sm border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                <label class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 cursor-pointer">
+                  <input type="checkbox" id="limit-all" onchange="document.getElementById('limit').value = this.checked ? '0' : '100'; document.getElementById('limit').disabled = this.checked;"
+                         class="rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500">
+                  All
+                </label>
+              </div>
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Use 0 or check "All" to retrieve all records</p>
+            </div>
+          </div>
+
+          <!-- Submit Button -->
+          <button type="submit" id="submit-btn"
+                  class="w-full px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">
+            Send Request
+          </button>
+        </form>
+
+        <!-- cURL Example -->
+        <div class="mt-6">
+          <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">cURL Equivalent</h3>
+          <pre id="curl-example" class="text-xs font-mono bg-gray-50 dark:bg-gray-900 p-3 rounded overflow-x-auto text-gray-700 dark:text-gray-300">curl -X POST /api/log/submit \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"game":"mhs","playerId":"player001","eventType":"level_complete","level":5}'</pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- Response Panel -->
+    <div class="bg-white dark:bg-gray-800 rounded shadow flex flex-col">
+      <div class="p-3 border-b dark:border-gray-700 flex items-center justify-between">
+        <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Response</h2>
+        <div id="response-meta" class="text-sm text-gray-500 dark:text-gray-400 hidden">
+          <span id="response-status" class="font-semibold"></span>
+          <span class="mx-2">|</span>
+          <span id="response-time"></span>
+        </div>
+      </div>
+      <div class="flex-1 overflow-auto p-4">
+        <div id="response-placeholder" class="h-full flex items-center justify-center text-gray-400 dark:text-gray-500">
+          <p>Send a request to see the response</p>
+        </div>
+        <div id="response-content" class="hidden">
+          <pre id="response-body" class="text-sm font-mono bg-gray-50 dark:bg-gray-900 p-3 rounded overflow-auto"></pre>
+        </div>
+        <div id="response-error" class="hidden">
+          <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded p-4">
+            <p class="text-red-700 dark:text-red-400" id="error-message"></p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Toggle API key visibility
+function toggleApiKey() {
+  var masked = document.getElementById('apikey-masked');
+  var visible = document.getElementById('apikey-visible');
+  var showIcon = document.getElementById('apikey-show-icon');
+  var hideIcon = document.getElementById('apikey-hide-icon');
+
+  if (masked.classList.contains('hidden')) {
+    masked.classList.remove('hidden');
+    visible.classList.add('hidden');
+    showIcon.classList.remove('hidden');
+    hideIcon.classList.add('hidden');
+  } else {
+    masked.classList.add('hidden');
+    visible.classList.remove('hidden');
+    showIcon.classList.add('hidden');
+    hideIcon.classList.remove('hidden');
+  }
+}
+
+// Toggle fields based on operation
+document.querySelectorAll('input[name="operation"]').forEach(function(radio) {
+  radio.addEventListener('change', function() {
+    var isSubmit = this.value === 'submit';
+    document.getElementById('submit-fields').classList.toggle('hidden', !isSubmit);
+    document.getElementById('list-fields').classList.toggle('hidden', isSubmit);
+    document.getElementById('endpoint-display').textContent = isSubmit ? '/api/log/submit' : '/api/log/list?game=...';
+    document.getElementById('legacy-endpoint-display').textContent = isSubmit ? '/logs' : '/logs?game=...';
+    updateCurlExample();
+  });
+});
+
+function updateCurlExample() {
+  var operation = document.querySelector('input[name="operation"]:checked').value;
+  var game = document.getElementById('game').value || 'mhs';
+  var curlEl = document.getElementById('curl-example');
+
+  if (operation === 'submit') {
+    var playerId = document.getElementById('playerId').value || 'player001';
+    var eventType = document.getElementById('eventType').value || 'level_complete';
+    curlEl.textContent = `curl -X POST /api/log/submit \\
+  -H "Authorization: Bearer YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"game":"${game}","playerId":"${playerId}","eventType":"${eventType}"}'`;
+  } else {
+    curlEl.textContent = `curl -X GET "/api/log/list?game=${game}" \\
+  -H "Authorization: Bearer YOUR_API_KEY"`;
+  }
+}
+
+// Update curl on input changes
+['game', 'playerId', 'eventType'].forEach(function(id) {
+  var el = document.getElementById(id);
+  if (el) el.addEventListener('input', updateCurlExample);
+});
+
+function executeRequest(e) {
+  e.preventDefault();
+
+  var operation = document.querySelector('input[name="operation"]:checked').value;
+  var game = document.getElementById('game').value;
+
+  var url, method, body;
+
+  if (operation === 'submit') {
+    url = '/api/log/submit';
+    method = 'POST';
+
+    var requestBody = { game: game };
+    var playerId = document.getElementById('playerId').value;
+    var eventType = document.getElementById('eventType').value;
+    var dataStr = document.getElementById('data').value;
+
+    if (playerId) requestBody.playerId = playerId;
+    if (eventType) requestBody.eventType = eventType;
+
+    if (dataStr) {
+      try {
+        var additionalData = JSON.parse(dataStr);
+        Object.assign(requestBody, additionalData);
+      } catch (err) {
+        showError('Invalid JSON in additional data: ' + err.message);
+        return;
+      }
+    }
+    body = JSON.stringify(requestBody);
+  } else {
+    var params = new URLSearchParams({ game: game });
+    var filterPlayer = document.getElementById('filter_playerId').value;
+    var filterEvent = document.getElementById('filter_eventType').value;
+    var limit = document.getElementById('limit').value;
+
+    if (filterPlayer) params.set('playerId', filterPlayer);
+    if (filterEvent) params.set('eventType', filterEvent);
+    if (limit) params.set('limit', limit);
+
+    url = '/api/log/list?' + params.toString();
+    method = 'GET';
+  }
+
+  var startTime = performance.now();
+
+  fetch(url, {
+    method: method,
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer {{ .APIKey }}'
+    },
+    body: body
+  })
+  .then(function(response) {
+    var endTime = performance.now();
+    var duration = Math.round(endTime - startTime);
+
+    return response.json().then(function(data) {
+      showResponse(response.status, duration, data);
+    });
+  })
+  .catch(function(err) {
+    showError('Request failed: ' + err.message);
+  });
+}
+
+function showResponse(status, duration, data) {
+  document.getElementById('response-placeholder').classList.add('hidden');
+  document.getElementById('response-error').classList.add('hidden');
+  document.getElementById('response-content').classList.remove('hidden');
+  document.getElementById('response-meta').classList.remove('hidden');
+
+  var statusEl = document.getElementById('response-status');
+  statusEl.textContent = status;
+  statusEl.className = 'font-semibold ' + (status >= 200 && status < 300 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400');
+
+  document.getElementById('response-time').textContent = duration + 'ms';
+  document.getElementById('response-body').textContent = JSON.stringify(data, null, 2);
+}
+
+function showError(message) {
+  document.getElementById('response-placeholder').classList.add('hidden');
+  document.getElementById('response-content').classList.add('hidden');
+  document.getElementById('response-meta').classList.add('hidden');
+  document.getElementById('response-error').classList.remove('hidden');
+  document.getElementById('error-message').textContent = message;
+}
+</script>
+{{ end }}

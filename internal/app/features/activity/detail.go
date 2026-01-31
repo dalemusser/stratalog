@@ -12,9 +12,9 @@ import (
 	"slices"
 	"time"
 
-	activitystore "github.com/dalemusser/stratasave/internal/app/store/activity"
-	"github.com/dalemusser/stratasave/internal/app/system/timezones"
-	"github.com/dalemusser/stratasave/internal/app/system/viewdata"
+	activitystore "github.com/dalemusser/stratalog/internal/app/store/activity"
+	"github.com/dalemusser/stratalog/internal/app/system/timezones"
+	"github.com/dalemusser/stratalog/internal/app/system/viewdata"
 	"github.com/dalemusser/waffle/pantry/templates"
 	"github.com/go-chi/chi/v5"
 	"go.mongodb.org/mongo-driver/bson"

@@ -1,0 +1,343 @@
+{{ define "logbrowser/recent" }}
+  {{ template "layout" . }}
+{{ end }}
+
+{{ define "content" }}
+<div class="flex flex-col h-full">
+  <!-- Header -->
+  <div class="mb-4 flex items-center">
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">🕐 Recent Logs</h1>
+    <!-- Timezone selector -->
+    <div class="flex-1 flex justify-center">
+      <select id="tz-select" style="width: 380px;" class="text-sm border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+        {{ range .TimezoneGroups }}
+        <optgroup label="{{ .Region }}">
+          {{ range .Zones }}
+          <option value="{{ .ID }}">{{ .Label }}</option>
+          {{ end }}
+        </optgroup>
+        {{ end }}
+      </select>
+    </div>
+    <div class="flex items-center gap-4">
+      <!-- Follow toggle -->
+      <button id="follow-btn" onclick="toggleFollow()" class="px-3 py-2 text-sm border dark:border-gray-600 rounded flex items-center gap-2 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+        <span id="follow-icon" class="text-green-500">&#9679;</span>
+        <span id="follow-text">Follow</span>
+      </button>
+      <!-- Limit selector -->
+      <label class="text-sm text-gray-600 dark:text-gray-400">Show:</label>
+      <select id="limit-select" onchange="changeLimit(this.value)" class="text-sm border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded px-3 py-2">
+        {{ range .LimitOptions }}
+        <option value="{{ . }}" {{ if eq . $.Limit }}selected{{ end }}>{{ . }}</option>
+        {{ end }}
+      </select>
+    </div>
+  </div>
+
+  <!-- Stats Row -->
+  <div class="mb-4 flex items-center gap-4">
+    <span id="stats-text" class="text-sm text-gray-600 dark:text-gray-400">
+      Showing <span id="shown-count">{{ len .Logs }}</span> of <span id="total-count">{{ .Total }}</span> total logs across all games
+    </span>
+    <span id="follow-status" class="text-sm text-gray-500 dark:text-gray-500 hidden"></span>
+  </div>
+
+  <!-- Logs Section -->
+  <section class="bg-white dark:bg-gray-800 rounded shadow flex-1 flex flex-col min-h-0">
+    <div class="p-3 border-b dark:border-gray-700 flex items-center justify-between">
+      <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Log Entries</h2>
+    </div>
+
+    <div id="logs-container" class="flex-1 overflow-auto">
+      <div id="logs-list" class="divide-y dark:divide-gray-700">
+        {{ range $index, $log := .Logs }}
+        {{ template "logbrowser/recent_log_entry" $log }}
+        {{ end }}
+      </div>
+      {{ if not .Logs }}
+      <p id="no-logs-msg" class="p-4 text-sm text-gray-500 dark:text-gray-400">No logs found in the database.</p>
+      {{ end }}
+    </div>
+  </section>
+</div>
+
+<script>
+var eventSource = null;
+var isFollowing = false;
+var currentLimit = {{ .Limit }};
+
+function toggleFollow() {
+  if (isFollowing) {
+    stopFollow();
+  } else {
+    startFollow();
+  }
+}
+
+function startFollow() {
+  if (eventSource) {
+    eventSource.close();
+  }
+
+  eventSource = new EventSource('/console/api/logs/recent/stream');
+
+  eventSource.addEventListener('connected', function(e) {
+    isFollowing = true;
+    updateFollowUI();
+    setFollowStatus('Connected - waiting for logs...');
+  });
+
+  eventSource.addEventListener('log', function(e) {
+    try {
+      var log = JSON.parse(e.data);
+      prependLog(log);
+      setFollowStatus('Last update: ' + new Date().toLocaleTimeString());
+    } catch (err) {
+      console.error('Failed to parse log event:', err);
+    }
+  });
+
+  eventSource.onerror = function(e) {
+    console.error('SSE error:', e);
+    if (eventSource.readyState === EventSource.CLOSED) {
+      setFollowStatus('Disconnected - reconnecting...');
+    }
+  };
+
+  isFollowing = true;
+  updateFollowUI();
+}
+
+function stopFollow() {
+  if (eventSource) {
+    eventSource.close();
+    eventSource = null;
+  }
+  isFollowing = false;
+  updateFollowUI();
+  setFollowStatus('');
+}
+
+function updateFollowUI() {
+  var btn = document.getElementById('follow-btn');
+  var icon = document.getElementById('follow-icon');
+  var text = document.getElementById('follow-text');
+
+  if (isFollowing) {
+    btn.classList.remove('bg-white', 'dark:bg-gray-700');
+    btn.classList.add('bg-green-50', 'dark:bg-green-900/20', 'border-green-500');
+    icon.innerHTML = '&#9632;'; // Stop square
+    icon.classList.remove('text-green-500');
+    icon.classList.add('text-red-500');
+    text.textContent = 'Stop';
+  } else {
+    btn.classList.add('bg-white', 'dark:bg-gray-700');
+    btn.classList.remove('bg-green-50', 'dark:bg-green-900/20', 'border-green-500');
+    icon.innerHTML = '&#9679;'; // Circle
+    icon.classList.add('text-green-500');
+    icon.classList.remove('text-red-500');
+    text.textContent = 'Follow';
+  }
+}
+
+function setFollowStatus(msg) {
+  var statusEl = document.getElementById('follow-status');
+  if (msg) {
+    statusEl.textContent = msg;
+    statusEl.classList.remove('hidden');
+  } else {
+    statusEl.classList.add('hidden');
+  }
+}
+
+function prependLog(log) {
+  var list = document.getElementById('logs-list');
+  var noLogsMsg = document.getElementById('no-logs-msg');
+
+  // Remove "no logs" message if present
+  if (noLogsMsg) {
+    noLogsMsg.remove();
+  }
+
+  // Create new log entry
+  var entry = document.createElement('div');
+  entry.className = 'p-3 bg-green-50 dark:bg-green-900/10';
+  entry.style.transition = 'background-color 2s ease-out';
+
+  var timestamp = new Date(log.serverTimestamp);
+  var formattedTime = formatTimestamp(timestamp);
+
+  var dataHtml = '';
+  if (log.data && Object.keys(log.data).length > 0) {
+    var dataJson = JSON.stringify(log.data, null, 2);
+    dataHtml = '<details class="group">' +
+      '<summary class="flex items-center gap-2 cursor-pointer list-none">' +
+      '<span class="text-xs text-indigo-600 dark:text-indigo-400 hover:underline">' +
+      '<span class="group-open:hidden">Show data</span>' +
+      '<span class="hidden group-open:inline">Hide data</span>' +
+      '</span></summary>' +
+      '<pre class="mt-2 p-3 text-xs bg-gray-50 dark:bg-gray-900 rounded overflow-auto max-h-64 text-gray-800 dark:text-gray-200">' + escapeHtml(dataJson) + '</pre>' +
+      '</details>';
+  }
+
+  var playerLink = log.playerId ? '&player=' + encodeURIComponent(log.playerId) : '';
+
+  entry.innerHTML = '<div class="flex items-center justify-between mb-2">' +
+    '<div class="text-sm text-gray-600 dark:text-gray-400">' +
+    '<span class="font-semibold text-blue-600 dark:text-blue-400">[' + escapeHtml(log.game) + ']</span>' +
+    (log.eventType ? ' <span class="font-semibold text-indigo-600 dark:text-indigo-400">[' + escapeHtml(log.eventType) + ']</span>' : '') +
+    (log.playerId ? ' <span class="text-green-600 dark:text-green-400">' + escapeHtml(log.playerId) + '</span> - ' : '') +
+    '<span class="tz-time" data-datetime="' + timestamp.toISOString() + '">' + formattedTime + '</span>' +
+    '</div>' +
+    '<a href="/console/api/logs?game=' + encodeURIComponent(log.game) + playerLink + '" class="px-2 py-1 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700">View in Browser</a>' +
+    '</div>' + dataHtml;
+
+  // Insert at top
+  list.insertBefore(entry, list.firstChild);
+
+  // Fade out highlight
+  setTimeout(function() {
+    entry.classList.remove('bg-green-50', 'dark:bg-green-900/10');
+  }, 100);
+
+  // Update count
+  var shownCount = document.getElementById('shown-count');
+  shownCount.textContent = parseInt(shownCount.textContent) + 1;
+  var totalCount = document.getElementById('total-count');
+  totalCount.textContent = parseInt(totalCount.textContent) + 1;
+
+  // Trim list if over limit
+  var entries = list.children;
+  while (entries.length > currentLimit) {
+    list.removeChild(list.lastChild);
+    shownCount.textContent = parseInt(shownCount.textContent) - 1;
+  }
+}
+
+function formatTimestamp(date) {
+  var tz = document.getElementById('tz-select').value || 'UTC';
+  try {
+    var options = {
+      timeZone: tz,
+      year: 'numeric',
+      month: 'short',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+      timeZoneName: 'short'
+    };
+    var formatted = date.toLocaleString('en-US', options);
+    return formatted.replace(/, (\d{2}:)/, ' $1');
+  } catch (e) {
+    return date.toISOString();
+  }
+}
+
+function escapeHtml(text) {
+  var div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function changeLimit(limit) {
+  window.location.href = '/console/api/logs/recent?limit=' + limit;
+}
+
+// Timezone handling
+(function() {
+  var tzSelect = document.getElementById('tz-select');
+  if (!tzSelect) return;
+
+  var STORAGE_KEY = 'log_browser_timezone';
+  var browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  var storedTz = localStorage.getItem(STORAGE_KEY);
+  var currentTz = storedTz || browserTz;
+
+  function findTimezoneOption(tz) {
+    var options = tzSelect.options;
+    for (var i = 0; i < options.length; i++) {
+      if (options[i].value === tz) return tz;
+    }
+    return 'UTC';
+  }
+
+  var selectedTz = findTimezoneOption(currentTz);
+  tzSelect.value = selectedTz;
+
+  function formatTimestamps(tz) {
+    document.querySelectorAll('.tz-time').forEach(function(el) {
+      var iso = el.getAttribute('data-datetime');
+      if (!iso) return;
+
+      var date = new Date(iso);
+      if (isNaN(date.getTime())) return;
+
+      try {
+        var options = {
+          timeZone: tz,
+          year: 'numeric',
+          month: 'short',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false,
+          timeZoneName: 'short'
+        };
+        var formatted = date.toLocaleString('en-US', options);
+        formatted = formatted.replace(/, (\d{2}:)/, ' $1');
+        el.textContent = formatted;
+      } catch (e) {
+        console.warn('Invalid timezone:', tz, e);
+      }
+    });
+  }
+
+  formatTimestamps(selectedTz);
+
+  tzSelect.addEventListener('change', function() {
+    var tz = tzSelect.value;
+    localStorage.setItem(STORAGE_KEY, tz);
+    formatTimestamps(tz);
+  });
+})();
+
+// Clean up on page unload
+window.addEventListener('beforeunload', function() {
+  if (eventSource) {
+    eventSource.close();
+  }
+});
+</script>
+{{ end }}
+
+{{ define "logbrowser/recent_log_entry" }}
+<div class="p-3">
+  <div class="flex items-center justify-between mb-2">
+    <div class="text-sm text-gray-600 dark:text-gray-400">
+      <span class="font-semibold text-blue-600 dark:text-blue-400">[{{ .Game }}]</span>
+      {{ if .EventType }}<span class="font-semibold text-indigo-600 dark:text-indigo-400">[{{ .EventType }}]</span> {{ end }}
+      {{ if .PlayerID }}<span class="text-green-600 dark:text-green-400">{{ .PlayerID }}</span> - {{ end }}
+      <span class="tz-time" data-datetime="{{ .ServerTimestamp.Format "2006-01-02T15:04:05Z" }}">{{ .ServerTimestamp.Format "Jan 02, 2006 15:04:05" }} UTC</span>
+    </div>
+    <a href="/console/api/logs?game={{ .Game }}{{ if .PlayerID }}&player={{ .PlayerID }}{{ end }}"
+       class="px-2 py-1 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700">
+      View in Browser
+    </a>
+  </div>
+  {{ if .Data }}
+  <details class="group">
+    <summary class="flex items-center gap-2 cursor-pointer list-none">
+      <span class="text-xs text-indigo-600 dark:text-indigo-400 hover:underline">
+        <span class="group-open:hidden">Show data</span>
+        <span class="hidden group-open:inline">Hide data</span>
+      </span>
+    </summary>
+    <pre class="mt-2 p-3 text-xs bg-gray-50 dark:bg-gray-900 rounded overflow-auto max-h-64 text-gray-800 dark:text-gray-200">{{ .Data }}</pre>
+  </details>
+  {{ end }}
+</div>
+{{ end }}

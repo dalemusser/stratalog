@@ -2,11 +2,11 @@
 package activity
 
 import (
-	uierrors "github.com/dalemusser/stratasave/internal/app/features/errors"
-	"github.com/dalemusser/stratasave/internal/app/store/activity"
-	"github.com/dalemusser/stratasave/internal/app/store/sessions"
-	userstore "github.com/dalemusser/stratasave/internal/app/store/users"
-	"github.com/dalemusser/stratasave/internal/app/system/auth"
+	uierrors "github.com/dalemusser/stratalog/internal/app/features/errors"
+	"github.com/dalemusser/stratalog/internal/app/store/activity"
+	"github.com/dalemusser/stratalog/internal/app/store/sessions"
+	userstore "github.com/dalemusser/stratalog/internal/app/store/users"
+	"github.com/dalemusser/stratalog/internal/app/system/auth"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.uber.org/zap"
 )

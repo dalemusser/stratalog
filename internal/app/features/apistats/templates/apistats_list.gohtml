@@ -12,10 +12,8 @@
       <div class="flex border dark:border-gray-600 rounded overflow-hidden">
         <a href="/console/api/stats?range={{ .TimeRange }}"
            class="px-4 py-2 text-sm {{ if eq .APIFilter "" }}bg-indigo-600 text-white{{ else }}bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600{{ end }}">All</a>
-        <a href="/console/api/stats?range={{ .TimeRange }}&api=state"
-           class="px-4 py-2 text-sm border-l dark:border-gray-600 {{ if eq .APIFilter "state" }}bg-indigo-600 text-white{{ else }}bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600{{ end }}">State API</a>
-        <a href="/console/api/stats?range={{ .TimeRange }}&api=settings"
-           class="px-4 py-2 text-sm border-l dark:border-gray-600 {{ if eq .APIFilter "settings" }}bg-indigo-600 text-white{{ else }}bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600{{ end }}">Settings API</a>
+        <a href="/console/api/stats?range={{ .TimeRange }}&api=log"
+           class="px-4 py-2 text-sm border-l dark:border-gray-600 {{ if eq .APIFilter "log" }}bg-indigo-600 text-white{{ else }}bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600{{ end }}">Log API</a>
       </div>
       <!-- Time Range Selector -->
       <select id="time-range" onchange="updateTimeRange(this.value)"
@@ -266,11 +264,9 @@ if (tzSelect) {
   });
 }
 
-// Chart data from server
-const stateSaveData = {{ toJSON .StateSaveData }};
-const stateLoadData = {{ toJSON .StateLoadData }};
-const settingsSaveData = {{ toJSON .SettingsSaveData }};
-const settingsLoadData = {{ toJSON .SettingsLoadData }};
+// Chart data from server (Log API)
+const logSubmitData = {{ toJSON .LogSubmitData }};
+const logListData = {{ toJSON .LogListData }};
 const timeRange = '{{ .TimeRange }}';
 
 // Helper to format timestamps using selected timezone
@@ -352,39 +348,21 @@ const labels = sortedTimestamps.map(ts => formatTimestamp(ts));
 // Build datasets based on available data
 function buildRequestsDatasets() {
   const datasets = [];
-  if (stateSaveData && stateSaveData.length > 0) {
+  if (logSubmitData && logSubmitData.length > 0) {
     datasets.push({
-      label: 'Save State',
-      data: getDataValues(stateSaveData, sortedTimestamps, 'Requests'),
+      label: 'Log Submit',
+      data: getDataValues(logSubmitData, sortedTimestamps, 'Requests'),
       borderColor: 'rgb(99, 102, 241)',
       backgroundColor: 'rgba(99, 102, 241, 0.1)',
       tension: 0.1
     });
   }
-  if (stateLoadData && stateLoadData.length > 0) {
+  if (logListData && logListData.length > 0) {
     datasets.push({
-      label: 'Load State',
-      data: getDataValues(stateLoadData, sortedTimestamps, 'Requests'),
+      label: 'Log List',
+      data: getDataValues(logListData, sortedTimestamps, 'Requests'),
       borderColor: 'rgb(34, 197, 94)',
       backgroundColor: 'rgba(34, 197, 94, 0.1)',
-      tension: 0.1
-    });
-  }
-  if (settingsSaveData && settingsSaveData.length > 0) {
-    datasets.push({
-      label: 'Save Settings',
-      data: getDataValues(settingsSaveData, sortedTimestamps, 'Requests'),
-      borderColor: 'rgb(249, 115, 22)',
-      backgroundColor: 'rgba(249, 115, 22, 0.1)',
-      tension: 0.1
-    });
-  }
-  if (settingsLoadData && settingsLoadData.length > 0) {
-    datasets.push({
-      label: 'Load Settings',
-      data: getDataValues(settingsLoadData, sortedTimestamps, 'Requests'),
-      borderColor: 'rgb(236, 72, 153)',
-      backgroundColor: 'rgba(236, 72, 153, 0.1)',
       tension: 0.1
     });
   }
@@ -393,39 +371,21 @@ function buildRequestsDatasets() {
 
 function buildResponseTimeDatasets() {
   const datasets = [];
-  if (stateSaveData && stateSaveData.length > 0) {
+  if (logSubmitData && logSubmitData.length > 0) {
     datasets.push({
-      label: 'Save State',
-      data: getDataValues(stateSaveData, sortedTimestamps, 'AvgMs'),
+      label: 'Log Submit',
+      data: getDataValues(logSubmitData, sortedTimestamps, 'AvgMs'),
       borderColor: 'rgb(99, 102, 241)',
       backgroundColor: 'rgba(99, 102, 241, 0.1)',
       tension: 0.1
     });
   }
-  if (stateLoadData && stateLoadData.length > 0) {
+  if (logListData && logListData.length > 0) {
     datasets.push({
-      label: 'Load State',
-      data: getDataValues(stateLoadData, sortedTimestamps, 'AvgMs'),
+      label: 'Log List',
+      data: getDataValues(logListData, sortedTimestamps, 'AvgMs'),
       borderColor: 'rgb(34, 197, 94)',
       backgroundColor: 'rgba(34, 197, 94, 0.1)',
-      tension: 0.1
-    });
-  }
-  if (settingsSaveData && settingsSaveData.length > 0) {
-    datasets.push({
-      label: 'Save Settings',
-      data: getDataValues(settingsSaveData, sortedTimestamps, 'AvgMs'),
-      borderColor: 'rgb(249, 115, 22)',
-      backgroundColor: 'rgba(249, 115, 22, 0.1)',
-      tension: 0.1
-    });
-  }
-  if (settingsLoadData && settingsLoadData.length > 0) {
-    datasets.push({
-      label: 'Load Settings',
-      data: getDataValues(settingsLoadData, sortedTimestamps, 'AvgMs'),
-      borderColor: 'rgb(236, 72, 153)',
-      backgroundColor: 'rgba(236, 72, 153, 0.1)',
       tension: 0.1
     });
   }

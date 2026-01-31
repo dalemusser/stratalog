@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dalemusser/stratasave/internal/app/store/ratelimit"
-	userstore "github.com/dalemusser/stratasave/internal/app/store/users"
-	"github.com/dalemusser/stratasave/internal/app/system/authutil"
-	"github.com/dalemusser/stratasave/internal/testutil"
+	"github.com/dalemusser/stratalog/internal/app/store/ratelimit"
+	userstore "github.com/dalemusser/stratalog/internal/app/store/users"
+	"github.com/dalemusser/stratalog/internal/app/system/authutil"
+	"github.com/dalemusser/stratalog/internal/testutil"
 	"go.uber.org/zap"
 )
 

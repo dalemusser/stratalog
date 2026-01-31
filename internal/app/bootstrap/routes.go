@@ -4,51 +4,49 @@ package bootstrap
 import (
 	"context"
 	"net/http"
-	"strconv"
+	"strings"
 	"time"
 
-	activityfeature "github.com/dalemusser/stratasave/internal/app/features/activity"
-	apistatsfeature "github.com/dalemusser/stratasave/internal/app/features/apistats"
-	announcementsfeature "github.com/dalemusser/stratasave/internal/app/features/announcements"
-	apikeysfeature "github.com/dalemusser/stratasave/internal/app/features/apikeys"
-	saveapifeature "github.com/dalemusser/stratasave/internal/app/features/saveapi"
-	savebrowserfeature "github.com/dalemusser/stratasave/internal/app/features/savebrowser"
-	settingsapifeature "github.com/dalemusser/stratasave/internal/app/features/settingsapi"
-	settingsbrowserfeature "github.com/dalemusser/stratasave/internal/app/features/settingsbrowser"
-	auditlogfeature "github.com/dalemusser/stratasave/internal/app/features/auditlog"
-	authgooglefeature "github.com/dalemusser/stratasave/internal/app/features/authgoogle"
-	dashboardfeature "github.com/dalemusser/stratasave/internal/app/features/dashboard"
-	errorsfeature "github.com/dalemusser/stratasave/internal/app/features/errors"
-	filesfeature "github.com/dalemusser/stratasave/internal/app/features/files"
-	healthfeature "github.com/dalemusser/stratasave/internal/app/features/health"
-	heartbeatfeature "github.com/dalemusser/stratasave/internal/app/features/heartbeat"
-	homefeature "github.com/dalemusser/stratasave/internal/app/features/home"
-	invitationsfeature "github.com/dalemusser/stratasave/internal/app/features/invitations"
-	jobsfeature "github.com/dalemusser/stratasave/internal/app/features/jobs"
-	ledgerfeature "github.com/dalemusser/stratasave/internal/app/features/ledger"
-	loginfeature "github.com/dalemusser/stratasave/internal/app/features/login"
-	logoutfeature "github.com/dalemusser/stratasave/internal/app/features/logout"
-	pagesfeature "github.com/dalemusser/stratasave/internal/app/features/pages"
-	profilefeature "github.com/dalemusser/stratasave/internal/app/features/profile"
-	settingsfeature "github.com/dalemusser/stratasave/internal/app/features/settings"
-	statsfeature "github.com/dalemusser/stratasave/internal/app/features/stats"
-	statusfeature "github.com/dalemusser/stratasave/internal/app/features/status"
-	systemusersfeature "github.com/dalemusser/stratasave/internal/app/features/systemusers"
-	appresources "github.com/dalemusser/stratasave/internal/app/resources"
-	"github.com/dalemusser/stratasave/internal/app/store/activity"
-	apistatsstore "github.com/dalemusser/stratasave/internal/app/store/apistats"
-	ledgerstore "github.com/dalemusser/stratasave/internal/app/store/ledger"
-	"github.com/dalemusser/stratasave/internal/app/system/apistats"
-	"github.com/dalemusser/stratasave/internal/app/system/ledger"
-	announcementstore "github.com/dalemusser/stratasave/internal/app/store/announcement"
-	"github.com/dalemusser/stratasave/internal/app/store/audit"
-	"github.com/dalemusser/stratasave/internal/app/store/oauthstate"
-	"github.com/dalemusser/stratasave/internal/app/store/ratelimit"
-	"github.com/dalemusser/stratasave/internal/app/store/sessions"
-	userstore "github.com/dalemusser/stratasave/internal/app/store/users"
-	"github.com/dalemusser/stratasave/internal/app/system/auth"
-	"github.com/dalemusser/stratasave/internal/app/system/auditlog"
-	"github.com/dalemusser/stratasave/internal/app/system/viewdata"
+	activityfeature "github.com/dalemusser/stratalog/internal/app/features/activity"
+	announcementsfeature "github.com/dalemusser/stratalog/internal/app/features/announcements"
+	apikeysfeature "github.com/dalemusser/stratalog/internal/app/features/apikeys"
+	apistatsfeature "github.com/dalemusser/stratalog/internal/app/features/apistats"
+	auditlogfeature "github.com/dalemusser/stratalog/internal/app/features/auditlog"
+	logapifeature "github.com/dalemusser/stratalog/internal/app/features/logapi"
+	logbrowserfeature "github.com/dalemusser/stratalog/internal/app/features/logbrowser"
+	authgooglefeature "github.com/dalemusser/stratalog/internal/app/features/authgoogle"
+	dashboardfeature "github.com/dalemusser/stratalog/internal/app/features/dashboard"
+	errorsfeature "github.com/dalemusser/stratalog/internal/app/features/errors"
+	filesfeature "github.com/dalemusser/stratalog/internal/app/features/files"
+	healthfeature "github.com/dalemusser/stratalog/internal/app/features/health"
+	heartbeatfeature "github.com/dalemusser/stratalog/internal/app/features/heartbeat"
+	homefeature "github.com/dalemusser/stratalog/internal/app/features/home"
+	invitationsfeature "github.com/dalemusser/stratalog/internal/app/features/invitations"
+	jobsfeature "github.com/dalemusser/stratalog/internal/app/features/jobs"
+	ledgerfeature "github.com/dalemusser/stratalog/internal/app/features/ledger"
+	loginfeature "github.com/dalemusser/stratalog/internal/app/features/login"
+	logoutfeature "github.com/dalemusser/stratalog/internal/app/features/logout"
+	pagesfeature "github.com/dalemusser/stratalog/internal/app/features/pages"
+	profilefeature "github.com/dalemusser/stratalog/internal/app/features/profile"
+	settingsfeature "github.com/dalemusser/stratalog/internal/app/features/settings"
+	statsfeature "github.com/dalemusser/stratalog/internal/app/features/stats"
+	statusfeature "github.com/dalemusser/stratalog/internal/app/features/status"
+	systemusersfeature "github.com/dalemusser/stratalog/internal/app/features/systemusers"
+	appresources "github.com/dalemusser/stratalog/internal/app/resources"
+	"github.com/dalemusser/stratalog/internal/app/store/activity"
+	apistatsstore "github.com/dalemusser/stratalog/internal/app/store/apistats"
+	ledgerstore "github.com/dalemusser/stratalog/internal/app/store/ledger"
+	"github.com/dalemusser/stratalog/internal/app/system/apistats"
+	"github.com/dalemusser/stratalog/internal/app/system/ledger"
+	announcementstore "github.com/dalemusser/stratalog/internal/app/store/announcement"
+	"github.com/dalemusser/stratalog/internal/app/store/audit"
+	"github.com/dalemusser/stratalog/internal/app/store/oauthstate"
+	"github.com/dalemusser/stratalog/internal/app/store/ratelimit"
+	"github.com/dalemusser/stratalog/internal/app/store/sessions"
+	userstore "github.com/dalemusser/stratalog/internal/app/store/users"
+	"github.com/dalemusser/stratalog/internal/app/system/auth"
+	"github.com/dalemusser/stratalog/internal/app/system/auditlog"
+	"github.com/dalemusser/stratalog/internal/app/system/viewdata"
 	"github.com/dalemusser/waffle/config"
 	"github.com/dalemusser/waffle/middleware"
 	"github.com/dalemusser/waffle/pantry/fileserver"
@@ -217,11 +215,12 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			path := req.URL.Path
 			// Skip CSRF for:
-			// - Game API routes (use API key auth)
+			// - Log API routes (use API key auth)
 			// - Heartbeat API (internal JS calls with session auth)
 			// - Invitation acceptance (the invitation token itself provides CSRF protection)
-			switch path {
-			case "/save", "/load", "/api/state/save", "/api/state/load", "/api/settings/save", "/api/settings/load", "/api/heartbeat", "/invite":
+			// - Public log view/download endpoints (no auth required)
+			if path == "/api/heartbeat" || path == "/invite" ||
+				strings.HasPrefix(path, "/logs") || strings.HasPrefix(path, "/api/log/") {
 				next.ServeHTTP(w, req)
 				return
 			}
@@ -255,37 +254,47 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 	}
 
 	// ─────────────────────────────────────────────────────────────────────────────
-	// Game State API Routes
+	// Log API Routes
 	// These routes use API key authentication. CSRF is handled above via path exemption.
 	// API errors are logged to the ledger for debugging.
 	// ─────────────────────────────────────────────────────────────────────────────
-	saveapiHandler := saveapifeature.NewHandler(deps.MongoDatabase, logger, appCfg.MaxSavesPerUser)
+	logapiHandler := logapifeature.NewHandler(deps.MongoDatabase, logger, appCfg.MaxBatchSize)
 
-	// New API endpoints: POST /api/state/save and POST /api/state/load
-	r.Route("/api/state", func(r chi.Router) {
-		r.Use(ledger.Middleware(apiLedgerConfig))
-		r.Mount("/", saveapifeature.Routes(saveapiHandler, apiStatsRecorder, appCfg.APIKey, logger))
+	// Log Browser Console (admin and developer) - create early so we can get the hub
+	logbrowserHandler := logbrowserfeature.NewHandler(deps.MongoDatabase, errLog, 25, appCfg.APIKey, logger)
+
+	// Wire up SSE broadcasting: when logs are submitted, broadcast to connected clients
+	logHub := logbrowserHandler.Hub()
+	logapiHandler.SetBroadcaster(func(game, playerID, eventType string, serverTimestamp time.Time, data map[string]interface{}) {
+		logHub.Broadcast(logbrowserfeature.LogEvent{
+			Game:        game,
+			PlayerID:    playerID,
+			EventType:   eventType,
+			ServerTimestamp: serverTimestamp,
+			Data:        data,
+		})
 	})
 
-	// Legacy endpoints for backward compatibility: POST /save and POST /load
-	r.Route("/save", func(r chi.Router) {
-		r.Use(ledger.Middleware(apiLedgerConfig))
-		r.Mount("/", saveapifeature.LegacyRoutes(saveapiHandler, apiStatsRecorder, appCfg.APIKey, logger))
-	})
-	r.Route("/load", func(r chi.Router) {
-		r.Use(ledger.Middleware(apiLedgerConfig))
-		r.Mount("/", saveapifeature.LegacyLoadRoutes(saveapiHandler, apiStatsRecorder, appCfg.APIKey, logger))
-	})
+	// New API endpoints: POST /api/log/submit, GET /api/log/list
+	r.Mount("/api/log", logapifeature.Routes(logapiHandler, apiStatsRecorder, apiLedgerConfig, appCfg.APIKey, logger))
 
-	// ─────────────────────────────────────────────────────────────────────────────
-	// Player Settings API Routes
-	// POST /api/settings/save and POST /api/settings/load
-	// API errors are logged to the ledger for debugging.
-	// ─────────────────────────────────────────────────────────────────────────────
-	settingsapiHandler := settingsapifeature.NewHandler(deps.MongoDatabase, logger)
-	r.Route("/api/settings", func(r chi.Router) {
-		r.Use(ledger.Middleware(apiLedgerConfig))
-		r.Mount("/", settingsapifeature.Routes(settingsapiHandler, apiStatsRecorder, appCfg.APIKey, logger))
+	// Legacy endpoints for /logs (backward compatibility)
+	// - POST /logs - Submit log entries (requires API key)
+	// - GET /logs - List log entries (requires API key)
+	// - GET /logs/view?game=<name> - HTML view (public, no auth)
+	// - GET /logs/download?game=<name> - JSON download (public, no auth)
+	r.Route("/logs", func(r chi.Router) {
+		// Public endpoints (no auth)
+		r.Get("/view", logapiHandler.ViewHandler)
+		r.Get("/download", logapiHandler.DownloadHandler)
+
+		// Authenticated endpoints (API key required)
+		r.Group(func(r chi.Router) {
+			r.Use(ledger.Middleware(apiLedgerConfig))
+			r.Use(auth.APIKeyAuth(appCfg.APIKey, logger))
+			r.With(apistats.MiddlewareWithRecorder(apiStatsRecorder, apistatsstore.StatTypeLogSubmit)).Post("/", logapiHandler.SubmitHandler)
+			r.With(apistats.MiddlewareWithRecorder(apiStatsRecorder, apistatsstore.StatTypeLogList)).Get("/", logapiHandler.ListHandler)
+		})
 	})
 
 	// Health check endpoints for load balancers and orchestrators
@@ -518,31 +527,8 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 	apistatsHandler := apistatsfeature.NewHandler(deps.MongoDatabase, apiStatsStore, apiStatsRecorder, errLog, logger)
 	r.Mount("/console/api/stats", apistatsfeature.Routes(apistatsHandler, sessionMgr))
 
-	// State API Console (admin and developer)
-	// Parse max saves config (default to 10 for browser display)
-	stateBrowserLimit := 10
-	if appCfg.MaxSavesPerUser != "" && appCfg.MaxSavesPerUser != "all" {
-		if n, err := strconv.Atoi(appCfg.MaxSavesPerUser); err == nil && n > 0 {
-			stateBrowserLimit = n
-		}
-	}
-	stateBrowserHandler := savebrowserfeature.NewHandler(
-		deps.MongoDatabase,
-		errLog,
-		stateBrowserLimit,
-		appCfg.APIKey,
-		logger,
-	)
-	r.Mount("/console/api/state", savebrowserfeature.Routes(stateBrowserHandler, sessionMgr))
-
-	// Settings API Console (admin and developer)
-	settingsBrowserHandler := settingsbrowserfeature.NewHandler(
-		deps.MongoDatabase,
-		errLog,
-		appCfg.APIKey,
-		logger,
-	)
-	r.Mount("/console/api/settings", settingsbrowserfeature.Routes(settingsBrowserHandler, sessionMgr))
+	// Log Browser Console (admin and developer) - handler created earlier for SSE hub wiring
+	r.Mount("/console/api/logs", logbrowserfeature.Routes(logbrowserHandler, sessionMgr))
 
 	// 404 catch-all for unmatched routes
 	r.NotFound(errorsHandler.NotFound)

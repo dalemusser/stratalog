@@ -98,8 +98,9 @@ type AppConfig struct {
 	SeedAdminEmail string // Email of the admin user to create on startup (if set)
 	SeedAdminName  string // Name of the admin user to create on startup
 
-	// Save retention configuration
-	MaxSavesPerUser string // Max saves per user per game ("all" or a number like "5")
+	// Log configuration
+	MaxBatchSize int // Maximum number of entries in a batch log submission (default: 100)
+	MaxBodySize  int // Maximum request body size in bytes (default: 1MB)
 
 	// API stats configuration
 	APIStatsBucket time.Duration // Bucket duration for API stats (default: 1h)

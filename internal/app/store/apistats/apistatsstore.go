@@ -23,6 +23,8 @@ const (
 	StatTypeLoadState    StatType = "state_load"
 	StatTypeSaveSettings StatType = "settings_save"
 	StatTypeLoadSettings StatType = "settings_load"
+	StatTypeLogSubmit    StatType = "log_submit"
+	StatTypeLogList      StatType = "log_list"
 )
 
 // Bucket represents a time bucket of aggregated statistics.

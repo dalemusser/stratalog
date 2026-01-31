@@ -11,22 +11,20 @@ import (
 )
 
 // EnvVarPrefix is the prefix for environment variables.
-// Change this constant when forking stratasave for a new project.
-// For example, change to "STRATALOG" for a stratalog project.
-const EnvVarPrefix = "STRATASAVE"
+const EnvVarPrefix = "STRATALOG"
 
 // appConfigKeys defines the configuration keys for this application.
 // These are loaded via WAFFLE's config system with support for:
 //   - Config files: mongo_uri, session_name, etc.
-//   - Environment variables: STRATASAVE_MONGO_URI, STRATASAVE_SESSION_NAME, etc.
+//   - Environment variables: STRATALOG_MONGO_URI, STRATALOG_SESSION_NAME, etc.
 //   - Command-line flags: --mongo_uri, --session_name, etc.
 var appConfigKeys = []config.AppKey{
 	{Name: "mongo_uri", Default: "mongodb://localhost:27017", Desc: "MongoDB connection URI"},
-	{Name: "mongo_database", Default: "stratasave", Desc: "MongoDB database name"},
+	{Name: "mongo_database", Default: "stratalog", Desc: "MongoDB database name"},
 	{Name: "mongo_max_pool_size", Default: 100, Desc: "MongoDB max connection pool size (default: 100)"},
 	{Name: "mongo_min_pool_size", Default: 10, Desc: "MongoDB min connection pool size (default: 10)"},
 	{Name: "session_key", Default: "dev-only-change-me-please-0123456789ABCDEF", Desc: "Session signing key (must be strong in production)"},
-	{Name: "session_name", Default: "stratasave-session", Desc: "Session cookie name"},
+	{Name: "session_name", Default: "stratalog-session", Desc: "Session cookie name"},
 	{Name: "session_domain", Default: "", Desc: "Session cookie domain (blank means current host)"},
 	{Name: "session_max_age", Default: "24h", Desc: "Session cookie max age (e.g., 24h, 720h, 30m)"},
 
@@ -65,7 +63,7 @@ var appConfigKeys = []config.AppKey{
 	{Name: "mail_smtp_user", Default: "", Desc: "SMTP username"},
 	{Name: "mail_smtp_pass", Default: "", Desc: "SMTP password"},
 	{Name: "mail_from", Default: "noreply@example.com", Desc: "From email address"},
-	{Name: "mail_from_name", Default: "StrataSave", Desc: "From display name"},
+	{Name: "mail_from_name", Default: "StrataLog", Desc: "From display name"},
 
 	// Base URL for email links (magic links, etc.)
 	{Name: "base_url", Default: "http://localhost:8080", Desc: "Base URL for email links"},
@@ -85,8 +83,9 @@ var appConfigKeys = []config.AppKey{
 	{Name: "seed_admin_email", Default: "", Desc: "Email of admin user to create on startup"},
 	{Name: "seed_admin_name", Default: "Admin", Desc: "Name of admin user to create on startup"},
 
-	// Save retention configuration
-	{Name: "max_saves_per_user", Default: "5", Desc: "Max saves per user per game ('all' or a number)"},
+	// Log configuration
+	{Name: "max_batch_size", Default: 100, Desc: "Maximum number of entries in a batch log submission"},
+	{Name: "max_body_size", Default: 1048576, Desc: "Maximum request body size in bytes (default: 1MB)"},
 
 	// API stats configuration
 	{Name: "api_stats_bucket", Default: "1h", Desc: "API stats bucket duration (e.g., '1m', '15m', '1h', '24h')"},
@@ -102,7 +101,7 @@ var appConfigKeys = []config.AppKey{
 // WAFFLE's config.LoadWithAppConfig handles:
 //   - Loading from .env files
 //   - Loading from config.yaml/json/toml files
-//   - Reading environment variables (WAFFLE_* for core, STRATASAVE_* for app)
+//   - Reading environment variables (WAFFLE_* for core, STRATALOG_* for app)
 //   - Parsing command-line flags
 //   - Merging with precedence: flags > env > files > defaults
 func LoadConfig(logger *zap.Logger) (*config.CoreConfig, AppConfig, error) {
@@ -174,8 +173,9 @@ func LoadConfig(logger *zap.Logger) (*config.CoreConfig, AppConfig, error) {
 		SeedAdminEmail: appValues.String("seed_admin_email"),
 		SeedAdminName:  appValues.String("seed_admin_name"),
 
-		// Save retention
-		MaxSavesPerUser: appValues.String("max_saves_per_user"),
+		// Log configuration
+		MaxBatchSize: appValues.Int("max_batch_size"),
+		MaxBodySize:  appValues.Int("max_body_size"),
 
 		// API stats
 		APIStatsBucket: appValues.Duration("api_stats_bucket", 1*time.Hour),

@@ -3,8 +3,8 @@ package userstore
 import (
 	"testing"
 
-	"github.com/dalemusser/stratasave/internal/domain/models"
-	"github.com/dalemusser/stratasave/internal/testutil"
+	"github.com/dalemusser/stratalog/internal/domain/models"
+	"github.com/dalemusser/stratalog/internal/testutil"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"

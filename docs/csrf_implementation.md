@@ -1,12 +1,12 @@
 # CSRF Protection Implementation
 
-This document describes how Cross-Site Request Forgery (CSRF) protection is implemented in StrataSave and how derived applications can use it.
+This document describes how Cross-Site Request Forgery (CSRF) protection is implemented in StrataLog and how derived applications can use it.
 
 ---
 
 ## Overview
 
-StrataSave provides built-in CSRF protection using the [gorilla/csrf](https://github.com/gorilla/csrf) package. The implementation includes:
+StrataLog provides built-in CSRF protection using the [gorilla/csrf](https://github.com/gorilla/csrf) package. The implementation includes:
 
 - Server-side middleware that validates CSRF tokens on state-changing requests
 - Automatic token injection for HTMX requests via JavaScript
@@ -21,7 +21,7 @@ StrataSave provides built-in CSRF protection using the [gorilla/csrf](https://gi
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `STRATASAVE_CSRF_KEY` | `dev-only-csrf-key-please-change-0123456789` | CSRF token signing key (32+ chars in production) |
+| `STRATALOG_CSRF_KEY` | `dev-only-csrf-key-please-change-0123456789` | CSRF token signing key (32+ chars in production) |
 
 **Important:** Always use a strong, unique key in production. Generate one with:
 

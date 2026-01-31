@@ -6,13 +6,13 @@ import (
 	"net/http"
 	"time"
 
-	errorsfeature "github.com/dalemusser/stratasave/internal/app/features/errors"
-	apistatsstore "github.com/dalemusser/stratasave/internal/app/store/apistats"
-	apistatsystem "github.com/dalemusser/stratasave/internal/app/system/apistats"
-	"github.com/dalemusser/stratasave/internal/app/system/auth"
-	"github.com/dalemusser/stratasave/internal/app/system/timeouts"
-	"github.com/dalemusser/stratasave/internal/app/system/timezones"
-	"github.com/dalemusser/stratasave/internal/app/system/viewdata"
+	errorsfeature "github.com/dalemusser/stratalog/internal/app/features/errors"
+	apistatsstore "github.com/dalemusser/stratalog/internal/app/store/apistats"
+	apistatsystem "github.com/dalemusser/stratalog/internal/app/system/apistats"
+	"github.com/dalemusser/stratalog/internal/app/system/auth"
+	"github.com/dalemusser/stratalog/internal/app/system/timeouts"
+	"github.com/dalemusser/stratalog/internal/app/system/timezones"
+	"github.com/dalemusser/stratalog/internal/app/system/viewdata"
 	"github.com/dalemusser/waffle/pantry/templates"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.uber.org/zap"
@@ -51,9 +51,9 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 
 	bucketFilter := r.URL.Query().Get("bucket")
 
-	// API filter: "state", "settings", or "" (all)
+	// API filter: "log" or "" (all)
 	apiFilter := r.URL.Query().Get("api")
-	if apiFilter != "" && apiFilter != "state" && apiFilter != "settings" {
+	if apiFilter != "" && apiFilter != "log" {
 		apiFilter = "" // Invalid filter, reset to all
 	}
 
@@ -91,14 +91,15 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 	// Convert to view models and filter based on apiFilter
 	var summaryVMs []SummaryVM
 	for _, s := range summaries {
-		// Filter based on API type
-		isStateType := s.StatType == apistatsstore.StatTypeSaveState || s.StatType == apistatsstore.StatTypeLoadState
-		isSettingsType := s.StatType == apistatsstore.StatTypeSaveSettings || s.StatType == apistatsstore.StatTypeLoadSettings
+		// Filter based on API type - only include log types
+		isLogType := s.StatType == apistatsstore.StatTypeLogSubmit || s.StatType == apistatsstore.StatTypeLogList
 
-		if apiFilter == "state" && !isStateType {
+		if apiFilter == "log" && !isLogType {
 			continue
 		}
-		if apiFilter == "settings" && !isSettingsType {
+
+		// Only show log types (ignore any legacy state/settings data)
+		if !isLogType {
 			continue
 		}
 
@@ -118,16 +119,12 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 		summaryVMs = append(summaryVMs, vm)
 	}
 
-	// Get time series data for each stat type (only for relevant APIs based on filter)
-	var stateSaveData, stateLoadData, settingsSaveData, settingsLoadData []DataPointVM
+	// Get time series data for log stat types
+	var logSubmitData, logListData []DataPointVM
 
-	if apiFilter == "" || apiFilter == "state" {
-		stateSaveData = h.getTimeSeriesData(ctx, apistatsstore.StatTypeSaveState, startTime, endTime, bucketFilter)
-		stateLoadData = h.getTimeSeriesData(ctx, apistatsstore.StatTypeLoadState, startTime, endTime, bucketFilter)
-	}
-	if apiFilter == "" || apiFilter == "settings" {
-		settingsSaveData = h.getTimeSeriesData(ctx, apistatsstore.StatTypeSaveSettings, startTime, endTime, bucketFilter)
-		settingsLoadData = h.getTimeSeriesData(ctx, apistatsstore.StatTypeLoadSettings, startTime, endTime, bucketFilter)
+	if apiFilter == "" || apiFilter == "log" {
+		logSubmitData = h.getTimeSeriesData(ctx, apistatsstore.StatTypeLogSubmit, startTime, endTime, bucketFilter)
+		logListData = h.getTimeSeriesData(ctx, apistatsstore.StatTypeLogList, startTime, endTime, bucketFilter)
 	}
 
 	// Build available buckets list
@@ -155,10 +152,8 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 		TimeRange:        timeRange,
 		APIFilter:        apiFilter,
 		Summaries:        summaryVMs,
-		StateSaveData:    stateSaveData,
-		StateLoadData:    stateLoadData,
-		SettingsSaveData: settingsSaveData,
-		SettingsLoadData: settingsLoadData,
+		LogSubmitData:    logSubmitData,
+		LogListData:      logListData,
 		DataResolutions:  dataResolutions,
 		IsAdmin:          isAdmin,
 	}
@@ -307,12 +302,10 @@ func (h *Handler) HandleRollUp(w http.ResponseWriter, r *http.Request) {
 	endTime := time.Now().UTC()
 	startTime := endTime.Add(-time.Duration(daysBack) * 24 * time.Hour)
 
-	// Roll up each stat type
+	// Roll up log stat types
 	statTypes := []apistatsstore.StatType{
-		apistatsstore.StatTypeSaveState,
-		apistatsstore.StatTypeLoadState,
-		apistatsstore.StatTypeSaveSettings,
-		apistatsstore.StatTypeLoadSettings,
+		apistatsstore.StatTypeLogSubmit,
+		apistatsstore.StatTypeLogList,
 	}
 
 	for _, st := range statTypes {

@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/dalemusser/stratasave/internal/app/store/jobs"
+	"github.com/dalemusser/stratalog/internal/app/store/jobs"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 )

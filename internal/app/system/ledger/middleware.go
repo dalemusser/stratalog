@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dalemusser/stratasave/internal/app/store/ledger"
-	"github.com/dalemusser/stratasave/internal/app/system/auth"
+	"github.com/dalemusser/stratalog/internal/app/store/ledger"
+	"github.com/dalemusser/stratalog/internal/app/system/auth"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
