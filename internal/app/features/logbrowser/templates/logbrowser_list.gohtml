@@ -7,6 +7,7 @@
   <!-- Header -->
   <div class="mb-4 flex items-center">
     <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">📋 Log Browser</h1>
+    <span class="ml-3 text-sm text-gray-500 dark:text-gray-400">({{ .TotalAllLogs }} total logs)</span>
     <!-- Timezone selector -->
     <div class="flex-1 flex justify-center">
       <select id="tz-select" style="width: 380px;" class="text-sm border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-400">
@@ -34,27 +35,10 @@
   </div>
 
   {{ if .SelectedGame }}
-  <!-- Filters Row -->
-  <div class="mb-4 flex items-center gap-4">
-    <!-- Event Type Filter -->
-    {{ if .EventTypes }}
-    <select id="event-type-filter"
-            hx-get="/console/api/logs/data"
-            hx-target="#logs-section"
-            hx-swap="innerHTML"
-            hx-include="[name='game'],[name='player'],[name='limit']"
-            name="eventType"
-            class="text-sm border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded px-3 py-2">
-      <option value="">All Events</option>
-      {{ range .EventTypes }}
-      <option value="{{ . }}" {{ if eq . $.SelectedEventType }}selected{{ end }}>{{ . }}</option>
-      {{ end }}
-    </select>
-    {{ end }}
-    <input type="hidden" name="game" value="{{ .SelectedGame }}">
-    <input type="hidden" name="player" value="{{ .SelectedPlayer }}">
-    <input type="hidden" name="limit" value="{{ .LogLimit }}">
-  </div>
+  <!-- Hidden inputs for HTMX requests -->
+  <input type="hidden" name="game" value="{{ .SelectedGame }}">
+  <input type="hidden" name="player" value="{{ .SelectedPlayer }}">
+  <input type="hidden" name="limit" value="{{ .LogLimit }}">
 
   <!-- Players Section -->
   <section class="bg-white dark:bg-gray-800 rounded shadow mb-4 flex flex-col" style="max-height: 40vh;">
@@ -90,6 +74,25 @@
       {{ template "logbrowser/players_content" . }}
     </div>
   </section>
+
+  <!-- Event Type Filter (above logs, affects only the logs list below) -->
+  {{ if .EventTypes }}
+  <div class="mb-2 flex items-center gap-2">
+    <label class="text-sm text-gray-600 dark:text-gray-400">Filter by event:</label>
+    <select id="event-type-filter"
+            hx-get="/console/api/logs/data"
+            hx-target="#logs-section"
+            hx-swap="innerHTML"
+            hx-include="[name='game'],[name='player'],[name='limit']"
+            name="eventType"
+            class="text-sm border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded px-3 py-2">
+      <option value="">All Events</option>
+      {{ range .EventTypes }}
+      <option value="{{ . }}" {{ if eq . $.SelectedEventType }}selected{{ end }}>{{ . }}</option>
+      {{ end }}
+    </select>
+  </div>
+  {{ end }}
 
   <!-- Logs Section -->
   <section id="logs-section" class="bg-white dark:bg-gray-800 rounded shadow flex-1 flex flex-col min-h-0">

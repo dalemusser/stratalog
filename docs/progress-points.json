@@ -1,0 +1,85 @@
+[
+	{
+		"unit": 1,
+		"point": 1,
+		"eventKey": "DialogueNodeEvent:31:29",
+		"score": 2
+	},
+	{
+		"unit": 1,
+		"point": 2,
+		"eventKey": "DialogueNodeEvent:30:98",
+		"score": ""
+	
+	},
+	{
+		"unit": 1,
+		"point": 3,
+		"eventKey": "QuestActiveEvent:34",
+		"score": ""
+	
+	},
+	{
+		"unit": 1,
+		"point": 4,
+		"eventKey": "QuestFinishEvent:34",
+		"score": ""
+	
+	},
+	{
+		"unit": 2,
+		"point": 1,
+		"eventKey": "QuestFinishEvent:21",
+		"score": ""
+	
+	},
+	{
+		"unit": 2,
+		"point": 2,
+		"eventKey": "DialogueNodeEvent:20:26",
+		"score": ""
+	
+	},
+	{
+		"unit": 2,
+		"point": 3,
+		"eventKey": "DialogueNodeEvent:22:18",
+		"score": ""
+	
+	},
+	{
+		"unit": 2,
+		"point": 4,
+		"eventKey": "DialogueNodeEvent:23:17",
+		"score": ""
+	
+	},
+	{
+		"unit": 2,
+		"point": 5,
+		"eventKey": "DialogueNodeEvent:23:42",
+		"score": ""
+	
+	},
+	{
+		"unit": 2,
+		"point": 6,
+		"eventKey": "DialogueNodeEvent:18:284",
+		"score": ""
+	
+	},
+	{
+		"unit": 2,
+		"point": 7,
+		"eventKey": "DialogueNodeEvent:20:74", 
+		"score": ""
+	
+	},
+	{
+		"unit": 2,
+		"point": 7,
+		"eventKey": "DialogueNodeEvent:20:75", 
+		"score": ""
+	
+	}
+]

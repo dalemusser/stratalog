@@ -69,6 +69,9 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get total log count across all games
+	totalAllLogs, _ := h.store.CountAllLogs(ctx)
+
 	// Parse query params
 	selectedGame := r.URL.Query().Get("game")
 	selectedPlayer := r.URL.Query().Get("player")
@@ -114,6 +117,7 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 		Limit:             limit,
 		DefaultLimit:      h.defaultLimit,
 		APIKey:            h.apiKey,
+		TotalAllLogs:      totalAllLogs,
 	}
 
 	// If game selected, load players with counts

@@ -1,0 +1,896 @@
+We have the MHS Dashboard in StrataLog.  The MHS Dashboard displays the performance of gameplay on the dashboard for teachers to see. The Dashboard has a list of students and a list of units and progress points.  Each progress point in each unit displays a green or yellow square.  The determination of green or yellow comes from running database queries on the log data when provided eventKey values appear in the log data.  Once we receive a log entry with a given eventKey we know the student has progressed to a point where we can run the associated query to determine if they should receive a green or yellow for that progress point.
+
+In stratalog we receive log entries for a given playerId. Those log entries may contain an "eventKey" property. If the "eventKey" has one of the values presented below we then run a query for mongodb to determine if the player (playerId) should receive a "green" or "yellow" for the progress point (point) in the unit specified. The progress point values, once determined, are stored in a collection in the database for the MHS Dashboard to display in StrataHub.
+
+Originally I was thinking of checking log entries as they are submitted and if they match one of the eventKey values provided below the need to run the script for the given playerId and eventKey would be put in a queue where a grading service would pull items out of the queue, perform the query, and then put the result in the database to be used by the dashboard. One of the problems with the queue approach is that we have already had the logger collect log entries before there was an implementation of a queue.  And it is likely based on how development is going we won't have determined the eventKey values and database queries needed until we have collected some data for them which means for some players their records will exist in the database before there will be knowledge to add them to what the queueing mechanism knows those eventKey values should cause entries to be added to the queue.  So, this had me thinking the grader should query for the eventKey values and to know which ones have already been processed, keep the date and time of the last query and use that to determine which ones to retrieve in the next query.
+
+So, we need to write a service that handles the determination of green or yellow for progress points in units in the game for players. We need to determine how the results of the queries (the green and yellow values for each progress point for each player) are stored so that the dashboard can efficiently load them for display on the dashboard. 
+
+We need to determine how the following information is codified for the grader so we can add progress points for units as they are determined over time. 
+
+
+// --------------------------------------
+// unit 1, point 1
+// The following script is to be run when eventKey is "DialogueNodeEvent:31:29"
+
+// Always green
+let color = "green";
+color;
+
+
+
+// --------------------------------------
+// unit 1, point 2
+// The following script is to be run when eventKey is "DialogueNodeEvent:30:98"
+
+// Always green
+let color = "green";
+color;
+
+
+
+// --------------------------------------
+// unit 1, point 3
+// The following script is to be run when eventKey is "QuestActiveEvent:34"
+
+// -----------------------------
+// Configuration / constants
+// -----------------------------
+
+// Player identifier to evaluate
+const playerId = "wenyi10@mhs.mhs";
+
+// -----------------------------
+// Color evaluation logic
+// -----------------------------
+// Check whether the player has triggered
+// either of the specified DialogueNodeEvent keys.
+//
+// If ANY matching event exists → "yellow"
+// If NO matching event exists → "green"
+
+const color =
+  db.logdata.findOne({
+    game: "mhs",            // Restrict to the MHS game
+    playerId: playerId,     // Restrict to this specific player
+    eventKey: {
+      $in: [
+        "DialogueNodeEvent:70:25",
+        "DialogueNodeEvent:70:33"
+      ]
+    }
+  }) !== null
+    ? "yellow"
+    : "green";
+
+// -----------------------------
+// Final result
+// -----------------------------
+
+color;
+
+
+// --------------------------------------
+// unit 1, point 4
+// The following script is to be run when eventKey is "QuestFinishEvent:34"
+
+// Always green
+let color = "green";
+color;
+
+
+
+// --------------------------------------
+// unit 2, point 1
+// The following script is to be run when eventKey is "QuestFinishEvent:21"
+
+// -----------------------------
+// Configuration / constants
+// -----------------------------
+
+// Player identifier to evaluate
+const playerId = "wenyi10@mhs.mhs";
+
+// -----------------------------
+// Color evaluation logic
+// -----------------------------
+// Rule:
+// 1) The player MUST have triggered DialogueNodeEvent:68:29
+// 2) The player MUST NOT have triggered ANY of the listed yellow nodes
+//
+// If both conditions are true → "green"
+// Otherwise → "yellow"
+
+const color =
+  (
+    // Check for the required success node
+    db.logdata.findOne({
+      game: "mhs",            // Restrict to the MHS game
+      playerId: playerId,     // Restrict to this specific player
+      eventKey: "DialogueNodeEvent:68:29"
+    }) !== null &&
+
+    // Ensure none of the yellow nodes have been triggered
+    db.logdata.findOne({
+      game: "mhs",            // Restrict to the MHS game
+      playerId: playerId,     // Restrict to this specific player
+      eventKey: {
+        $in: [
+          "DialogueNodeEvent:68:23",
+          "DialogueNodeEvent:68:27",
+          "DialogueNodeEvent:68:28",
+          "DialogueNodeEvent:68:31"
+        ]
+      }
+    }) === null
+  )
+    ? "green"
+    : "yellow";
+
+// -----------------------------
+// Final result
+// -----------------------------
+
+color;
+
+
+
+// --------------------------------------
+// unit 2, point 2
+// The following script is to be run when eventKey is "DialogueNodeEvent:20:26"
+
+// -----------------------------
+// Configuration / constants
+// -----------------------------
+
+const playerId = "wenyi10@mhs.mhs";
+
+// Start and end markers defining the evaluation window
+const START_KEY = "DialogueNodeEvent:20:1";
+const END_KEY   = "DialogueNodeEvent:19:46";
+
+// Event keys we are counting inside the window
+const TARGET_KEYS = [
+  "DialogueNodeEvent:18:99",
+  "DialogueNodeEvent:28:179",
+  "DialogueNodeEvent:59:179",
+  "DialogueNodeEvent:18:223",
+  "DialogueNodeEvent:28:182",
+  "DialogueNodeEvent:59:182",
+  "DialogueNodeEvent:18:224",
+  "DialogueNodeEvent:28:183",
+  "DialogueNodeEvent:59:183"
+];
+
+// -----------------------------
+// Default result
+// -----------------------------
+// Default to "green" unless evidence forces "yellow"
+let color = "green";
+
+// -----------------------------
+// Step 1: Find the earliest START event
+// -----------------------------
+
+const startDoc = db.logdata
+  .find({
+    game: "mhs",
+    playerId: playerId,
+    eventKey: START_KEY
+  })
+  .sort({ timestamp: 1 }) // earliest occurrence
+  .limit(1)
+  .next();
+
+// If no START event exists, we keep the default color ("green")
+if (startDoc) {
+  const startIso = startDoc.timestamp;
+
+  // -----------------------------
+  // Step 2: Find the earliest END event
+  //         that occurs at or after START
+  // -----------------------------
+
+  const endDoc = db.logdata
+    .find({
+      game: "mhs",
+      playerId: playerId,
+      eventKey: END_KEY,
+      timestamp: { $gte: startIso }
+    })
+    .sort({ timestamp: 1 }) // earliest valid END
+    .limit(1)
+    .next();
+
+  // If no END event exists, we keep the default color ("green")
+  if (endDoc) {
+    const endIso = endDoc.timestamp;
+
+    // -----------------------------
+    // Step 3: Count TARGET events
+    //         within the START–END window
+    // -----------------------------
+
+    const countTargets = db.logdata.countDocuments({
+      game: "mhs",
+      playerId: playerId,
+      eventKey: { $in: TARGET_KEYS },
+      timestamp: {
+        $gte: startIso,
+        $lte: endIso
+      }
+    });
+
+    // -----------------------------
+    // Step 4: Apply color rule
+    // -----------------------------
+    // ≤ 1 target event → green
+    // > 1 target event → yellow
+
+    color = (countTargets <= 1) ? "green" : "yellow";
+  }
+}
+
+// -----------------------------
+// Final result
+// -----------------------------
+
+color;
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+// THE FOLLOWING IS AN UPDATED VERSION WITH A GUARD ON BAD TIME VALUES
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+// --------------------------------------
+// unit 2, point 2 (with duration guard)
+// The following script is to be run when eventKey is "DialogueNodeEvent:20:26"
+
+// -----------------------------
+// Configuration / constants
+// -----------------------------
+
+const playerId = "wenyi10@mhs.mhs";
+
+// Start and end markers defining the evaluation window
+const START_KEY = "DialogueNodeEvent:20:1";
+const END_KEY   = "DialogueNodeEvent:19:46";
+
+// Event keys we are counting inside the window
+const TARGET_KEYS = [
+  "DialogueNodeEvent:18:99",
+  "DialogueNodeEvent:28:179",
+  "DialogueNodeEvent:59:179",
+  "DialogueNodeEvent:18:223",
+  "DialogueNodeEvent:28:182",
+  "DialogueNodeEvent:59:182",
+  "DialogueNodeEvent:18:224",
+  "DialogueNodeEvent:28:183",
+  "DialogueNodeEvent:59:183"
+];
+
+// -----------------------------
+// Duration guard configuration
+// -----------------------------
+// Maximum allowed duration (in seconds) for this activity.
+// Adjust if needed based on gameplay expectations.
+const MAX_DURATION_SECONDS = 2 * 60 * 60; // 2 hours
+
+// -----------------------------
+// Default result
+// -----------------------------
+// Default to "green" unless evidence forces "yellow"
+let color = "green";
+
+// -----------------------------
+// Helper: parse ISO timestamp safely
+// -----------------------------
+
+function parseTimestamp(ts) {
+  const t = Date.parse(ts);
+  return Number.isFinite(t) ? t : null;
+}
+
+// -----------------------------
+// Step 1: Find the earliest START event
+// -----------------------------
+
+const startDoc = db.logdata
+  .find({
+    game: "mhs",
+    playerId: playerId,
+    eventKey: START_KEY,
+    timestamp: { $type: "string" } // guard against malformed records
+  })
+  .sort({ timestamp: 1 }) // earliest occurrence
+  .limit(1)
+  .next();
+
+// If no START event exists, we keep the default color ("green")
+if (startDoc) {
+  const startIso = startDoc.timestamp;
+  const startMs  = parseTimestamp(startIso);
+
+  // -----------------------------
+  // Step 2: Find the earliest END event
+  //         that occurs at or after START
+  // -----------------------------
+
+  const endDoc = db.logdata
+    .find({
+      game: "mhs",
+      playerId: playerId,
+      eventKey: END_KEY,
+      timestamp: { $gte: startIso, $type: "string" }
+    })
+    .sort({ timestamp: 1 }) // earliest valid END
+    .limit(1)
+    .next();
+
+  // If no END event exists, we keep the default color ("green")
+  if (endDoc) {
+    const endIso = endDoc.timestamp;
+    const endMs  = parseTimestamp(endIso);
+
+    // -----------------------------
+    // Step 3: Duration sanity check
+    // -----------------------------
+
+    if (
+      startMs === null ||
+      endMs === null ||
+      endMs < startMs ||
+      (endMs - startMs) / 1000 > MAX_DURATION_SECONDS
+    ) {
+      // Impossible or suspicious duration → treat as yellow
+      color = "yellow";
+    } else {
+      // -----------------------------
+      // Step 4: Count TARGET events
+      //         within the START–END window
+      // -----------------------------
+
+      const countTargets = db.logdata.countDocuments({
+        game: "mhs",
+        playerId: playerId,
+        eventKey: { $in: TARGET_KEYS },
+        timestamp: {
+          $gte: startIso,
+          $lte: endIso
+        }
+      });
+
+      // -----------------------------
+      // Step 5: Apply color rule
+      // -----------------------------
+      // ≤ 1 target event → green
+      // > 1 target event → yellow
+
+      color = (countTargets <= 1) ? "green" : "yellow";
+    }
+  }
+}
+
+// -----------------------------
+// Final result
+// -----------------------------
+
+color;
+
+
+
+// --------------------------------------
+// unit 2, point 3
+// The following script is to be run when eventKey is "DialogueNodeEvent:22:18"
+
+// -----------------------------
+// Configuration / constants
+// -----------------------------
+
+const playerId = "wenyi11@mhs.mhs";
+
+// Start and end markers defining the evaluation window
+const START_KEY = "DialogueNodeEvent:20:33";
+const END_KEY   = "DialogueNodeEvent:22:1";
+
+// Event keys to count inside the window
+const TARGET_KEYS = [
+  "DialogueNodeEvent:18:225", "DialogueNodeEvent:28:185", "DialogueNodeEvent:59:185",
+  "DialogueNodeEvent:28:184", "DialogueNodeEvent:28:191", "DialogueNodeEvent:59:184", "DialogueNodeEvent:59:191",
+  "DialogueNodeEvent:18:226", "DialogueNodeEvent:18:227", "DialogueNodeEvent:28:186", "DialogueNodeEvent:59:186",
+  "DialogueNodeEvent:18:228", "DialogueNodeEvent:28:187", "DialogueNodeEvent:59:187",
+  "DialogueNodeEvent:18:229", "DialogueNodeEvent:28:188", "DialogueNodeEvent:59:188",
+  "DialogueNodeEvent:18:230", "DialogueNodeEvent:28:180", "DialogueNodeEvent:59:180",
+  "DialogueNodeEvent:18:233", "DialogueNodeEvent:28:192", "DialogueNodeEvent:59:192",
+  "DialogueNodeEvent:18:234", "DialogueNodeEvent:28:193", "DialogueNodeEvent:59:193",
+  "DialogueNodeEvent:18:235", "DialogueNodeEvent:28:194", "DialogueNodeEvent:59:194",
+  "DialogueNodeEvent:18:236", "DialogueNodeEvent:18:237", "DialogueNodeEvent:28:190", "DialogueNodeEvent:59:190"
+];
+
+// -----------------------------
+// Default result
+// -----------------------------
+// Default to "green" unless evidence forces "yellow"
+let color = "green";
+
+// -----------------------------
+// Step 1: Find the earliest START event
+// -----------------------------
+
+const startDoc = db.logdata
+  .find({
+    game: "mhs",
+    playerId: playerId,
+    eventKey: START_KEY
+  })
+  .sort({ timestamp: 1 }) // earliest occurrence
+  .limit(1)
+  .next();
+
+// If no START event exists, color remains "green"
+if (startDoc) {
+  const startIso = startDoc.timestamp;
+
+  // -----------------------------
+  // Step 2: Find the earliest END event
+  //         that occurs at or after START
+  // -----------------------------
+
+  const endDoc = db.logdata
+    .find({
+      game: "mhs",
+      playerId: playerId,
+      eventKey: END_KEY,
+      timestamp: { $gte: startIso }
+    })
+    .sort({ timestamp: 1 }) // earliest valid END
+    .limit(1)
+    .next();
+
+  // If no END event exists, color remains "green"
+  if (endDoc) {
+    const endIso = endDoc.timestamp;
+
+    // -----------------------------
+    // Step 3: Count TARGET events
+    //         within the START–END window
+    // -----------------------------
+
+    const countTargets = db.logdata.countDocuments({
+      game: "mhs",
+      playerId: playerId,
+      eventKey: { $in: TARGET_KEYS },
+      timestamp: {
+        $gte: startIso,
+        $lte: endIso
+      }
+    });
+
+    // -----------------------------
+    // Step 4: Apply color rule
+    // -----------------------------
+    // ≤ 6 target events → green
+    // > 6 target events → yellow
+
+    color = (countTargets <= 6) ? "green" : "yellow";
+  }
+}
+
+// -----------------------------
+// Final result
+// -----------------------------
+
+color;
+
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+// THE FOLLOWING IS AN UPDATED VERSION WITH A GUARD ON BAD TIME VALUES
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+// --------------------------------------
+// unit 2, point 3 (with duration guard)
+// The following script is to be run when eventKey is "DialogueNodeEvent:22:18"
+
+// -----------------------------
+// Configuration / constants
+// -----------------------------
+
+const playerId = "wenyi11@mhs.mhs";
+
+// Start and end markers defining the evaluation window
+const START_KEY = "DialogueNodeEvent:20:33";
+const END_KEY   = "DialogueNodeEvent:22:1";
+
+// Event keys to count inside the window
+const TARGET_KEYS = [
+  "DialogueNodeEvent:18:225", "DialogueNodeEvent:28:185", "DialogueNodeEvent:59:185",
+  "DialogueNodeEvent:28:184", "DialogueNodeEvent:28:191", "DialogueNodeEvent:59:184", "DialogueNodeEvent:59:191",
+  "DialogueNodeEvent:18:226", "DialogueNodeEvent:18:227", "DialogueNodeEvent:28:186", "DialogueNodeEvent:59:186",
+  "DialogueNodeEvent:18:228", "DialogueNodeEvent:28:187", "DialogueNodeEvent:59:187",
+  "DialogueNodeEvent:18:229", "DialogueNodeEvent:28:188", "DialogueNodeEvent:59:188",
+  "DialogueNodeEvent:18:230", "DialogueNodeEvent:28:180", "DialogueNodeEvent:59:180",
+  "DialogueNodeEvent:18:233", "DialogueNodeEvent:28:192", "DialogueNodeEvent:59:192",
+  "DialogueNodeEvent:18:234", "DialogueNodeEvent:28:193", "DialogueNodeEvent:59:193",
+  "DialogueNodeEvent:18:235", "DialogueNodeEvent:28:194", "DialogueNodeEvent:59:194",
+  "DialogueNodeEvent:18:236", "DialogueNodeEvent:18:237", "DialogueNodeEvent:28:190", "DialogueNodeEvent:59:190"
+];
+
+// -----------------------------
+// Duration guard configuration
+// -----------------------------
+// Maximum allowed duration (in seconds) for this activity.
+// Adjust if gameplay expectations change.
+const MAX_DURATION_SECONDS = 2 * 60 * 60; // 2 hours
+
+// -----------------------------
+// Default result
+// -----------------------------
+// Default to "green" unless evidence forces "yellow"
+let color = "green";
+
+// -----------------------------
+// Helper: parse ISO timestamp safely
+// -----------------------------
+
+function parseTimestamp(ts) {
+  const t = Date.parse(ts);
+  return Number.isFinite(t) ? t : null;
+}
+
+// -----------------------------
+// Step 1: Find the earliest START event
+// -----------------------------
+
+const startDoc = db.logdata
+  .find({
+    game: "mhs",
+    playerId: playerId,
+    eventKey: START_KEY,
+    timestamp: { $type: "string" }
+  })
+  .sort({ timestamp: 1 }) // earliest occurrence
+  .limit(1)
+  .next();
+
+// If no START event exists, color remains "green"
+if (startDoc) {
+  const startIso = startDoc.timestamp;
+  const startMs  = parseTimestamp(startIso);
+
+  // -----------------------------
+  // Step 2: Find the earliest END event
+  //         that occurs at or after START
+  // -----------------------------
+
+  const endDoc = db.logdata
+    .find({
+      game: "mhs",
+      playerId: playerId,
+      eventKey: END_KEY,
+      timestamp: { $gte: startIso, $type: "string" }
+    })
+    .sort({ timestamp: 1 }) // earliest valid END
+    .limit(1)
+    .next();
+
+  // If no END event exists, color remains "green"
+  if (endDoc) {
+    const endIso = endDoc.timestamp;
+    const endMs  = parseTimestamp(endIso);
+
+    // -----------------------------
+    // Step 3: Duration sanity check
+    // -----------------------------
+
+    if (
+      startMs === null ||
+      endMs === null ||
+      endMs < startMs ||
+      (endMs - startMs) / 1000 > MAX_DURATION_SECONDS
+    ) {
+      // Impossible or suspicious duration → yellow
+      color = "yellow";
+    } else {
+      // -----------------------------
+      // Step 4: Count TARGET events
+      //         within the START–END window
+      // -----------------------------
+
+      const countTargets = db.logdata.countDocuments({
+        game: "mhs",
+        playerId: playerId,
+        eventKey: { $in: TARGET_KEYS },
+        timestamp: {
+          $gte: startIso,
+          $lte: endIso
+        }
+      });
+
+      // -----------------------------
+      // Step 5: Apply color rule
+      // -----------------------------
+      // ≤ 6 target events → green
+      // > 6 target events → yellow
+
+      color = (countTargets <= 6) ? "green" : "yellow";
+    }
+  }
+}
+
+// -----------------------------
+// Final result
+// -----------------------------
+
+color;
+
+
+
+// --------------------------------------
+// unit 2, point 4
+// The following script is to be run when eventKey is "DialogueNodeEvent:23:17"
+
+// -----------------------------
+// Configuration / constants
+// -----------------------------
+
+const playerId = "wenyi10@mhs.mhs";
+
+const success_key = "DialogueNodeEvent:74:21";
+
+const bad_keys = [
+  "DialogueNodeEvent:74:16",
+  "DialogueNodeEvent:74:17",
+  "DialogueNodeEvent:74:20",
+  "DialogueNodeEvent:74:22"
+];
+
+// -----------------------------
+// Default result
+// -----------------------------
+// Default to "yellow" unless success is present AND no bad feedback is present
+let color = "yellow";
+
+// -----------------------------
+// Step 1: Check for success node
+// -----------------------------
+
+const has_74_21 =
+  db.logdata.findOne({
+    game: "mhs",
+    playerId: playerId,
+    eventKey: success_key
+  }) !== null;
+
+// -----------------------------
+// Step 2: Check for any bad feedback nodes
+// -----------------------------
+
+const has_bad_feedback =
+  db.logdata.findOne({
+    game: "mhs",
+    playerId: playerId,
+    eventKey: { $in: bad_keys }
+  }) !== null;
+
+// -----------------------------
+// Step 3: Apply color rule
+// -----------------------------
+// green if success exists AND no bad feedback exists, else yellow
+
+if (has_74_21 && !has_bad_feedback) {
+  color = "green";
+} else {
+  color = "yellow";
+}
+
+// -----------------------------
+// Final result
+// -----------------------------
+
+color;
+
+
+
+// --------------------------------------
+// unit 2, point 5
+// The following script is to be run when eventKey is "DialogueNodeEvent:23:42"
+
+// -----------------------------
+// Configuration / constants
+// -----------------------------
+
+const playerId = "wenyi10@mhs.mhs";
+
+// Positive and negative event keys
+const POS_KEYS = [
+  "DialogueNodeEvent:23:140", "DialogueNodeEvent:23:142", "DialogueNodeEvent:23:143",
+  "DialogueNodeEvent:23:146", "DialogueNodeEvent:23:147", "DialogueNodeEvent:23:148",
+  "DialogueNodeEvent:23:165", "DialogueNodeEvent:23:166", "DialogueNodeEvent:23:167",
+  "DialogueNodeEvent:23:168", "DialogueNodeEvent:23:169", "DialogueNodeEvent:23:170",
+  "DialogueNodeEvent:23:172", "DialogueNodeEvent:23:173", "DialogueNodeEvent:23:174",
+  "DialogueNodeEvent:23:175", "DialogueNodeEvent:23:177", "DialogueNodeEvent:23:178",
+  "DialogueNodeEvent:23:179", "DialogueNodeEvent:23:180", "DialogueNodeEvent:23:181",
+  "DialogueNodeEvent:23:182", "DialogueNodeEvent:23:183", "DialogueNodeEvent:23:184",
+  "DialogueNodeEvent:23:185", "DialogueNodeEvent:23:186"
+];
+
+const NEG_KEYS = [
+  "DialogueNodeEvent:26:137", "DialogueNodeEvent:26:144", "DialogueNodeEvent:26:145",
+  "DialogueNodeEvent:26:187", "DialogueNodeEvent:26:188", "DialogueNodeEvent:26:189",
+  "DialogueNodeEvent:26:191", "DialogueNodeEvent:26:192", "DialogueNodeEvent:26:193",
+  "DialogueNodeEvent:26:194", "DialogueNodeEvent:26:195", "DialogueNodeEvent:26:196",
+  "DialogueNodeEvent:26:197", "DialogueNodeEvent:26:198", "DialogueNodeEvent:26:199",
+  "DialogueNodeEvent:26:200", "DialogueNodeEvent:26:201", "DialogueNodeEvent:26:202",
+  "DialogueNodeEvent:26:203", "DialogueNodeEvent:26:204", "DialogueNodeEvent:26:205",
+  "DialogueNodeEvent:26:206", "DialogueNodeEvent:26:207", "DialogueNodeEvent:26:208",
+  "DialogueNodeEvent:26:209", "DialogueNodeEvent:26:210", "DialogueNodeEvent:26:211"
+];
+
+// -----------------------------
+// Default result
+// -----------------------------
+// Default to "yellow" unless the score clears the threshold
+let color = "yellow";
+
+// -----------------------------
+// Step 1: Count positive events
+// -----------------------------
+
+const pos_count = db.logdata.countDocuments({
+  game: "mhs",
+  playerId: playerId,
+  eventKey: { $in: POS_KEYS }
+});
+
+// -----------------------------
+// Step 2: Count negative events
+// -----------------------------
+
+const neg_count = db.logdata.countDocuments({
+  game: "mhs",
+  playerId: playerId,
+  eventKey: { $in: NEG_KEYS }
+});
+
+// -----------------------------
+// Step 3: Compute score
+// -----------------------------
+// score = pos_count - (neg_count / 3.0)
+
+const score = pos_count - (neg_count / 3.0);
+
+// -----------------------------
+// Step 4: Apply color rule
+// -----------------------------
+// green if score >= 4, else yellow
+
+color = (score >= 4) ? "green" : "yellow";
+
+// -----------------------------
+// Final result
+// -----------------------------
+
+color;
+
+
+
+// --------------------------------------
+// unit 2, point 6
+// The following script is to be run when eventKey is "DialogueNodeEvent:18:284"
+
+// -----------------------------
+// Configuration / constants
+// -----------------------------
+
+const playerId = "wenyi10@mhs.mhs";
+
+// Nodes that indicate a "yellow" outcome
+const yellow_nodes = ["dialogue:20:44", "dialogue:20:45"];
+
+// Node that must exist to be considered a "pass"
+const pass_node_key = "dialogue:20:43";
+
+// -----------------------------
+// Default result
+// -----------------------------
+// Default to "yellow" (matches the Python logic: if no pass node, it's yellow)
+let color = "yellow";
+
+// -----------------------------
+// Step 1: Check for pass node
+// -----------------------------
+
+const passDoc = db.logdata.findOne({
+  game: "mhs",
+  playerId: playerId,
+  eventKey: pass_node_key
+});
+
+// If pass node is missing => yellow (and we stop here)
+if (!passDoc) {
+  color = "yellow";
+} else {
+  // -----------------------------
+  // Step 2: Check for any yellow nodes
+  // -----------------------------
+
+  const yellowDoc = db.logdata.findOne({
+    game: "mhs",
+    playerId: playerId,
+    eventKey: { $in: yellow_nodes }
+  });
+
+  // If any yellow node exists => yellow, else green
+  color = yellowDoc ? "yellow" : "green";
+}
+
+// -----------------------------
+// Final result
+// -----------------------------
+
+color;
+
+
+
+// --------------------------------------
+// unit 2, point 7
+// The following script is to be run when eventKey is "DialogueNodeEvent:20:74" or "DialogueNodeEvent:20:75"
+
+// -----------------------------
+// Configuration / constants
+// -----------------------------
+
+const playerId = "wenyi11@mhs.mhs";
+
+// Success marker
+const SUCCESS_KEY = "DialogueNodeEvent:27:7";
+
+// Negative feedback / mistake markers
+const NEG_KEYS = [
+  "DialogueNodeEvent:27:11", "DialogueNodeEvent:27:12", "DialogueNodeEvent:27:13", "DialogueNodeEvent:27:14",
+  "DialogueNodeEvent:27:15", "DialogueNodeEvent:27:16", "DialogueNodeEvent:27:17", "DialogueNodeEvent:27:18",
+  "DialogueNodeEvent:27:19", "DialogueNodeEvent:27:20", "DialogueNodeEvent:27:21", "DialogueNodeEvent:27:22",
+  "DialogueNodeEvent:27:23", "DialogueNodeEvent:27:24", "DialogueNodeEvent:27:25", "DialogueNodeEvent:27:26",
+  "DialogueNodeEvent:27:27", "DialogueNodeEvent:27:28", "DialogueNodeEvent:27:29", "DialogueNodeEvent:27:30"
+];
+
+// -----------------------------
+// Default result
+// -----------------------------
+// Default to "yellow" unless success exists AND negatives are within the limit
+let color = "yellow";
+
+// -----------------------------
+// Step 1: Check for success event
+// -----------------------------
+
+const has_success =
+  db.logdata.findOne({
+    game: "mhs",
+    playerId: playerId,
+    eventKey: SUCCESS_KEY
+  }) !== null;
+
+// -----------------------------
+// Step 2: Count negative events
+// -----------------------------
+
+const neg_count = db.logdata.countDocuments({
+  game: "mhs",
+  playerId: playerId,
+  eventKey: { $in: NEG_KEYS }
+});
+
+// -----------------------------
+// Step 3: Apply color rule
+// -----------------------------
+// green if success exists AND neg_count <= 3, else yellow
+
+color = (has_success && neg_count <= 3) ? "green" : "yellow";
+
+// -----------------------------
+// Final result
+// -----------------------------
+
+color;
+
+
+

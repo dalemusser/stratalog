@@ -18,6 +18,9 @@ type ListVM struct {
 	Games        []string
 	SelectedGame string
 
+	// Total logs across all games
+	TotalAllLogs int64
+
 	// Player filter
 	Players        []PlayerRowVM
 	SelectedPlayer string
