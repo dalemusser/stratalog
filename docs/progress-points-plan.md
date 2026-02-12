@@ -59,6 +59,7 @@ In practice:
 
 ## When grades are computed
 
+
 A grade is computed when a log record arrives whose `eventKey` matches a unit/point’s trigger.
 
 Most unit/points have **one trigger eventKey**.
@@ -66,6 +67,28 @@ Most unit/points have **one trigger eventKey**.
 One exception currently uses **two triggers**:
 
 - **Unit 2, Point 7** triggers on `DialogueNodeEvent:20:74` **or** `DialogueNodeEvent:20:75`.
+
+## Trigger map for grader configuration
+
+This table is the **authoritative mapping** the grader uses to decide **which rule to run** when a new log entry arrives.
+
+- **Unit/Point** identifies the dashboard cell.
+- **Trigger keys** are `eventKey` values that cause the grader to evaluate that unit/point for the player.
+- **ruleId** is a stable identifier for the grading rule (useful for versioning and audit/debug).
+
+| Unit | Point | ruleId   | Trigger eventKey(s) | Notes |
+|---:|---:|---|---|---|
+| 1 | 1 | u1p1_v1 | `DialogueNodeEvent:31:29` | Always green |
+| 1 | 2 | u1p2_v1 | `DialogueNodeEvent:30:98` | Always green |
+| 1 | 3 | u1p3_v1 | `QuestActiveEvent:34` | Yellow if `DialogueNodeEvent:70:25` or `DialogueNodeEvent:70:33` exists |
+| 1 | 4 | u1p4_v1 | `QuestFinishEvent:34` | Always green |
+| 2 | 1 | u2p1_v1 | `QuestFinishEvent:21` | Requires success node and no yellow nodes |
+| 2 | 2 | u2p2_v1 | `DialogueNodeEvent:20:26` | Uses START/END window + duration guard |
+| 2 | 3 | u2p3_v1 | `DialogueNodeEvent:22:18` | Uses START/END window + duration guard |
+| 2 | 4 | u2p4_v1 | `DialogueNodeEvent:23:17` | Green only if success exists and no bad feedback exists |
+| 2 | 5 | u2p5_v1 | `DialogueNodeEvent:23:42` | Score based on positive minus (negative/3) |
+| 2 | 6 | u2p6_v1 | `DialogueNodeEvent:18:284` | Pass node required; yellow if any yellow nodes exist |
+| 2 | 7 | u2p7_v1 | `DialogueNodeEvent:20:74`, `DialogueNodeEvent:20:75` | Two triggers for the same unit/point |
 
 ## Which unit/points use time duration
 

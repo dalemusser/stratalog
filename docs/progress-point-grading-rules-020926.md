@@ -1623,3 +1623,797 @@ if (!latestTrigger) {
 ```
 
 ---
+
+## Unit 3, Point 1
+
+**Title:** Good morning cadet + Establishing a foothold (Identify the direction of water flow based on a map of the watershed)
+
+**Trigger:** `questFinishEvent:17`
+
+### Data Analytics Script
+
+```python
+if has eventKey:
+    
+    cnt = coll.count_documents({"playerId": pid, "eventKey": "DialogueNodeEvent:10:30"})
+
+    if cnt > 1:
+        return 1  # green
+    else:
+        return 2  # yellow
+
+```
+
+Rule statement (matches analytics intent)
+- Count how many log entries exist for the player with:
+- eventKey = DialogueNodeEvent:10:30
+- If cnt > 1 → green
+- Else → yellow
+
+Notes:
+- This is count-based and (in the analytics version) counts across the player’s full history.
+
+The following script matches analytics intent.
+
+```js
+// Unit 3, Point 1 — Analytics-matching script
+// Trigger eventKey: "questFinishEvent:17"
+
+const playerId = "wenyi10@mhs.mhs";
+
+const cnt = db.logdata.countDocuments({
+  game: "mhs",
+  playerId: playerId,
+  eventKey: "DialogueNodeEvent:10:30"
+});
+
+const color = cnt > 1 ? "green" : "yellow";
+color;
+```
+
+### Unit 3 Point 1 Production Grading Script 
+
+Rule statement (latest attempt only, replay-safe)
+- Define the attempt window as:
+- previous questFinishEvent:17 (exclusive) to latest questFinishEvent:17 (inclusive), by _id
+- Within that window, count:
+- eventKey = DialogueNodeEvent:10:30
+- If cnt > 1 → green
+- Else → yellow
+- If the latest trigger does not exist → yellow (though in your trigger-queued pipeline this script would normally not run)
+
+Attempt-based standalone production script (player can replay)
+
+```js
+// Unit 3, Point 1 — Attempt-based standalone production script (latest attempt)
+// Trigger eventKey: "questFinishEvent:17"
+
+const playerId = "wenyi10@mhs.mhs";
+
+const TRIGGER_KEY = "questFinishEvent:17";
+const TARGET_KEY = "DialogueNodeEvent:10:30";
+
+// 1) Latest trigger (end anchor)
+const latestTrigger = db.logdata.findOne(
+  { game: "mhs", playerId: playerId, eventKey: TRIGGER_KEY },
+  { sort: { _id: -1 } }
+);
+
+if (!latestTrigger) {
+  "yellow";
+} else {
+  // 2) Previous trigger (attempt boundary)
+  const prevTrigger = db.logdata.findOne(
+    {
+      game: "mhs",
+      playerId: playerId,
+      eventKey: TRIGGER_KEY,
+      _id: { $lt: latestTrigger._id }
+    },
+    { sort: { _id: -1 } }
+  );
+
+  const windowStartId = prevTrigger ? prevTrigger._id : ObjectId("000000000000000000000000");
+  const windowEndId = latestTrigger._id;
+
+  // 3) Count target occurrences within attempt window
+  const cnt = db.logdata.countDocuments({
+    game: "mhs",
+    playerId: playerId,
+    eventKey: TARGET_KEY,
+    _id: { $gt: windowStartId, $lte: windowEndId }
+  });
+
+  cnt > 1 ? "green" : "yellow";
+}
+```
+
+---
+
+## Unit 3, Point 2
+
+**Title:** Pollution solution (Predict the spread of dissolved materials through a watershed.)
+
+**Trigger:** `DialogueNodeEvent:11:34`
+
+### Data Analytics Script
+
+```python
+If has eventKey:
+    c27 = coll.count_documents({"playerId": pid, "eventKey": "DialogueNodeEvent:11:27"})
+    c29 = coll.count_documents({"playerId": pid, "eventKey": "DialogueNodeEvent:11:29"})
+    c230 = coll.count_documents({"playerId": pid, "eventKey": "DialogueNodeEvent:11:230"})
+    cSum = c29 + c230
+    
+    def capped_penalty(cnt: int) -> int:
+        if cnt <= 1:
+            return 0
+        elif cnt <= 3:
+            return 1
+        else:
+            return 2
+
+    score = 5
+    score -= capped_penalty(c27)
+    score -= capped_penalty(cSum)
+
+    return 2 # yellow if score < 3 else 1 # green
+```
+
+Rule statement (matches analytics intent)
+- Count (over the player’s full history):
+- c27 = count of DialogueNodeEvent:11:27
+- c29 = count of DialogueNodeEvent:11:29
+- c230 = count of DialogueNodeEvent:11:230
+- cSum = c29 + c230
+- Define capped_penalty(cnt):
+- 0 if cnt <= 1
+- 1 if cnt <= 3
+- 2 if cnt >= 4
+- Compute:
+- score = 5 - capped_penalty(c27) - capped_penalty(cSum)
+- If score < 3 → yellow
+- Else → green
+
+
+The following script matches analytics intent.
+
+```js
+// Unit 3, Point 2 — Analytics-matching script
+// Trigger eventKey: "DialogueNodeEvent:11:34"
+
+const playerId = "wenyi10@mhs.mhs";
+
+function cappedPenalty(cnt) {
+  if (cnt <= 1) return 0;
+  if (cnt <= 3) return 1;
+  return 2;
+}
+
+const c27 = db.logdata.countDocuments({
+  game: "mhs",
+  playerId: playerId,
+  eventKey: "DialogueNodeEvent:11:27"
+});
+
+const c29 = db.logdata.countDocuments({
+  game: "mhs",
+  playerId: playerId,
+  eventKey: "DialogueNodeEvent:11:29"
+});
+
+const c230 = db.logdata.countDocuments({
+  game: "mhs",
+  playerId: playerId,
+  eventKey: "DialogueNodeEvent:11:230"
+});
+
+const cSum = c29 + c230;
+
+let score = 5;
+score -= cappedPenalty(c27);
+score -= cappedPenalty(cSum);
+
+const color = score < 3 ? "yellow" : "green";
+color;
+```
+
+### Unit 3 Point 2 Production Grading Script 
+
+Rule statement (latest attempt only, replay-safe)
+- Define the attempt window as:
+- previous DialogueNodeEvent:11:34 (exclusive) to latest DialogueNodeEvent:11:34 (inclusive), by _id
+- Within that window, count:
+- c27 for 11:27
+- c29 for 11:29
+- c230 for 11:230
+- cSum = c29 + c230
+- Use the same capped_penalty and score logic as above.
+- If score < 3 → yellow else green.
+- If no latest trigger exists → yellow (normally won’t run in your trigger-driven pipeline)
+
+```js
+// Unit 3, Point 2 — Attempt-based standalone production script (latest attempt)
+// Trigger eventKey: "DialogueNodeEvent:11:34"
+
+const playerId = "wenyi10@mhs.mhs";
+
+const TRIGGER_KEY = "DialogueNodeEvent:11:34";
+
+function cappedPenalty(cnt) {
+  if (cnt <= 1) return 0;
+  if (cnt <= 3) return 1;
+  return 2;
+}
+
+// 1) Latest trigger (end anchor)
+const latestTrigger = db.logdata.findOne(
+  { game: "mhs", playerId: playerId, eventKey: TRIGGER_KEY },
+  { sort: { _id: -1 } }
+);
+
+if (!latestTrigger) {
+  "yellow";
+} else {
+  // 2) Previous trigger (attempt boundary)
+  const prevTrigger = db.logdata.findOne(
+    {
+      game: "mhs",
+      playerId: playerId,
+      eventKey: TRIGGER_KEY,
+      _id: { $lt: latestTrigger._id }
+    },
+    { sort: { _id: -1 } }
+  );
+
+  const windowStartId = prevTrigger ? prevTrigger._id : ObjectId("000000000000000000000000");
+  const windowEndId = latestTrigger._id;
+
+  const c27 = db.logdata.countDocuments({
+    game: "mhs",
+    playerId: playerId,
+    eventKey: "DialogueNodeEvent:11:27",
+    _id: { $gt: windowStartId, $lte: windowEndId }
+  });
+
+  const c29 = db.logdata.countDocuments({
+    game: "mhs",
+    playerId: playerId,
+    eventKey: "DialogueNodeEvent:11:29",
+    _id: { $gt: windowStartId, $lte: windowEndId }
+  });
+
+  const c230 = db.logdata.countDocuments({
+    game: "mhs",
+    playerId: playerId,
+    eventKey: "DialogueNodeEvent:11:230",
+    _id: { $gt: windowStartId, $lte: windowEndId }
+  });
+
+  const cSum = c29 + c230;
+
+  let score = 5;
+  score -= cappedPenalty(c27);
+  score -= cappedPenalty(cSum);
+
+  score < 3 ? "yellow" : "green";
+}
+```
+
+---
+
+## Unit 3, Point 3
+
+**Title:** Pollution argument (Construct an argument with reasoning that links a claim with evidence.)
+
+**Trigger:** `questFinishEvent:18`
+
+### Data Analytics Script
+
+```python
+TARGET_KEYS = [
+        "DialogueNodeEvent:84:20", "DialogueNodeEvent:84:25", "DialogueNodeEvent:84:32",
+        "DialogueNodeEvent:84:33", "DialogueNodeEvent:84:34", "DialogueNodeEvent:84:35",
+        "DialogueNodeEvent:84:37", "DialogueNodeEvent:84:39", "DialogueNodeEvent:84:40",
+        "DialogueNodeEvent:84:41", "DialogueNodeEvent:84:42", "DialogueNodeEvent:84:43",
+        "DialogueNodeEvent:84:44", "DialogueNodeEvent:84:45", "DialogueNodeEvent:84:46",
+        "DialogueNodeEvent:84:47"
+]
+
+If has eventKey:
+    sum_count = coll.count_documents({
+        "playerId": pid,
+        "eventKey": {"$in": TARGET_KEYS}
+})
+
+if sum_count <= 3:
+        base_score = 3
+    elif sum_count == 4:
+        base_score = 2
+    elif sum_count == 5:
+        base_score = 1
+    else:
+        base_score = 0
+
+has_bonus = coll.find_one(
+        {
+            "playerId": pid,
+            "eventType": "argumentationToolEvent",
+            "data.toolName": "BackingInfoPanel - Pollution Site Data"}
+        },
+        projection={"_id": 1}
+    ) is not None
+
+total_score = base_score + (1 if has_bonus else 0)
+
+return 1 if total_score >= 3 else 2
+```
+
+Rule statement (matches analytics intent)
+- Count sum_count = number of log entries for the player with eventKey in TARGET_KEYS (full history).
+- Compute base_score from sum_count:
+- if sum_count <= 3 → base_score = 3
+- else if sum_count == 4 → base_score = 2
+- else if sum_count == 5 → base_score = 1
+- else (sum_count >= 6) → base_score = 0
+- Compute has_bonus (full history): true if there exists a log entry with:
+- eventType = "argumentationToolEvent" and
+- data.toolName = "BackingInfoPanel - Pollution Site Data"
+- total_score = base_score + (1 if has_bonus else 0)
+- If total_score >= 3 → green
+- Else → yellow
+
+The following script matches analytics intent.
+
+```js
+// Unit 3, Point 3 — Analytics-matching script
+// Trigger eventKey: "questFinishEvent:18"
+
+const playerId = "wenyi10@mhs.mhs";
+
+const TARGET_KEYS = [
+  "DialogueNodeEvent:84:20", "DialogueNodeEvent:84:25", "DialogueNodeEvent:84:32",
+  "DialogueNodeEvent:84:33", "DialogueNodeEvent:84:34", "DialogueNodeEvent:84:35",
+  "DialogueNodeEvent:84:37", "DialogueNodeEvent:84:39", "DialogueNodeEvent:84:40",
+  "DialogueNodeEvent:84:41", "DialogueNodeEvent:84:42", "DialogueNodeEvent:84:43",
+  "DialogueNodeEvent:84:44", "DialogueNodeEvent:84:45", "DialogueNodeEvent:84:46",
+  "DialogueNodeEvent:84:47"
+];
+
+const sumCount = db.logdata.countDocuments({
+  game: "mhs",
+  playerId: playerId,
+  eventKey: { $in: TARGET_KEYS }
+});
+
+let baseScore;
+if (sumCount <= 3) baseScore = 3;
+else if (sumCount === 4) baseScore = 2;
+else if (sumCount === 5) baseScore = 1;
+else baseScore = 0;
+
+const hasBonus =
+  db.logdata.findOne(
+    {
+      game: "mhs",
+      playerId: playerId,
+      eventType: "argumentationToolEvent",
+      "data.toolName": "BackingInfoPanel - Pollution Site Data"
+    },
+    { projection: { _id: 1 } }
+  ) !== null;
+
+const totalScore = baseScore + (hasBonus ? 1 : 0);
+
+const color = totalScore >= 3 ? "green" : "yellow";
+color;
+```
+
+### Unit 3 Point 3 Production Grading Script 
+
+Rule statement (latest attempt only, replay-safe)
+- Define the attempt window as:
+ - previous questFinishEvent:18 (exclusive) to latest questFinishEvent:18 (inclusive), by _id
+- Within that window:
+ - Count sum_count for TARGET_KEYS
+ - Determine base_score using the same mapping
+ - Determine has_bonus based on an argumentationToolEvent with data.toolName matching exactly
+ - total_score = base_score + bonus
+- If total_score >= 3 → green else yellow
+- If no latest trigger exists → yellow (normally won’t run in your trigger-driven pipeline)
+
+Attempt-based standalone production script (player can replay)
+
+```js
+// Unit 3, Point 3 — Attempt-based standalone production script (latest attempt)
+// Trigger eventKey: "questFinishEvent:18"
+
+const playerId = "wenyi10@mhs.mhs";
+
+const TRIGGER_KEY = "questFinishEvent:18";
+
+const TARGET_KEYS = [
+  "DialogueNodeEvent:84:20", "DialogueNodeEvent:84:25", "DialogueNodeEvent:84:32",
+  "DialogueNodeEvent:84:33", "DialogueNodeEvent:84:34", "DialogueNodeEvent:84:35",
+  "DialogueNodeEvent:84:37", "DialogueNodeEvent:84:39", "DialogueNodeEvent:84:40",
+  "DialogueNodeEvent:84:41", "DialogueNodeEvent:84:42", "DialogueNodeEvent:84:43",
+  "DialogueNodeEvent:84:44", "DialogueNodeEvent:84:45", "DialogueNodeEvent:84:46",
+  "DialogueNodeEvent:84:47"
+];
+
+// 1) Latest trigger (end anchor)
+const latestTrigger = db.logdata.findOne(
+  { game: "mhs", playerId: playerId, eventKey: TRIGGER_KEY },
+  { sort: { _id: -1 } }
+);
+
+if (!latestTrigger) {
+  "yellow";
+} else {
+  // 2) Previous trigger (attempt boundary)
+  const prevTrigger = db.logdata.findOne(
+    {
+      game: "mhs",
+      playerId: playerId,
+      eventKey: TRIGGER_KEY,
+      _id: { $lt: latestTrigger._id }
+    },
+    { sort: { _id: -1 } }
+  );
+
+  const windowStartId = prevTrigger ? prevTrigger._id : ObjectId("000000000000000000000000");
+  const windowEndId = latestTrigger._id;
+
+  const sumCount = db.logdata.countDocuments({
+    game: "mhs",
+    playerId: playerId,
+    eventKey: { $in: TARGET_KEYS },
+    _id: { $gt: windowStartId, $lte: windowEndId }
+  });
+
+  let baseScore;
+  if (sumCount <= 3) baseScore = 3;
+  else if (sumCount === 4) baseScore = 2;
+  else if (sumCount === 5) baseScore = 1;
+  else baseScore = 0;
+
+  const hasBonus =
+    db.logdata.findOne(
+      {
+        game: "mhs",
+        playerId: playerId,
+        eventType: "argumentationToolEvent",
+        "data.toolName": "BackingInfoPanel - Pollution Site Data",
+        _id: { $gt: windowStartId, $lte: windowEndId }
+      },
+      { projection: { _id: 1 } }
+    ) !== null;
+
+  const totalScore = baseScore + (hasBonus ? 1 : 0);
+
+  totalScore >= 3 ? "green" : "yellow";
+}
+```
+
+---
+
+## Unit 3, Point 4
+
+**Title:** Forsaken Facility (Predict the spread of dissolved materials)
+
+**Trigger:** `DialogueNodeEvent:73:200`
+
+### Data Analytics Script
+
+```python
+TARGET_KEYS = [
+        "DialogueNodeEvent:78:3", "DialogueNodeEvent:78:4", "DialogueNodeEvent:78:7",
+        "DialogueNodeEvent:78:9", "DialogueNodeEvent:78:10", "DialogueNodeEvent:78:12",
+        "DialogueNodeEvent:78:18", "DialogueNodeEvent:78:23"
+]
+
+If has eventKey:
+    has_7824 = coll.find_one(
+        {"playerId": pid, "eventKey": "DialogueNodeEvent:78:24"},
+        projection={"_id": 1}
+) is not None
+if not has_7824:
+        return 2 #yellow
+
+    total_count = coll.count_documents({
+        "playerId": pid,
+        "eventKey": {"$in": TARGET_KEYS}
+})
+
+if total_count == 0:
+        score = 2
+    elif total_count <= 2:
+        score = 1
+    else:
+        score = 0
+
+return 2 #yellow if score == 0 else 1 #green
+```
+
+Rule statement (matches analytics intent)
+- First, require the player to have:
+- DialogueNodeEvent:78:24
+- If missing → yellow
+- Then count total_count = number of log entries with eventKey in TARGET_KEYS (full history).
+- Compute score from total_count:
+- if total_count == 0 → score = 2
+- else if total_count <= 2 → score = 1
+- else (total_count >= 3) → score = 0
+- If score == 0 → yellow
+- Else → green
+
+
+The following script matches analytics intent.
+
+```js
+// Unit 3, Point 4 — Analytics-matching script
+// Trigger eventKey: "DialogueNodeEvent:73:200"
+
+const playerId = "wenyi10@mhs.mhs";
+
+const TARGET_KEYS = [
+  "DialogueNodeEvent:78:3", "DialogueNodeEvent:78:4", "DialogueNodeEvent:78:7",
+  "DialogueNodeEvent:78:9", "DialogueNodeEvent:78:10", "DialogueNodeEvent:78:12",
+  "DialogueNodeEvent:78:18", "DialogueNodeEvent:78:23"
+];
+
+// Gate: must have 78:24
+const has7824 =
+  db.logdata.findOne(
+    { game: "mhs", playerId: playerId, eventKey: "DialogueNodeEvent:78:24" },
+    { projection: { _id: 1 } }
+  ) !== null;
+
+if (!has7824) {
+  "yellow";
+} else {
+  const totalCount = db.logdata.countDocuments({
+    game: "mhs",
+    playerId: playerId,
+    eventKey: { $in: TARGET_KEYS }
+  });
+
+  let score;
+  if (totalCount === 0) score = 2;
+  else if (totalCount <= 2) score = 1;
+  else score = 0;
+
+  score === 0 ? "yellow" : "green";
+}
+```
+
+(So: missing 78:24 is immediate yellow; otherwise green unless target count is 3+.)
+
+### Unit 3 Point 4 Production Grading Script 
+
+Rule statement (latest attempt only, replay-safe)
+- Define the attempt window as:
+- previous DialogueNodeEvent:73:200 (exclusive) to latest DialogueNodeEvent:73:200 (inclusive), by _id.
+- Within that window:
+- Must have DialogueNodeEvent:78:24 or else yellow.
+- Count total_count for TARGET_KEYS.
+- Score mapping identical to analytics.
+- If score == 0 → yellow else green.
+- If no latest trigger exists → yellow (normally won’t run in your trigger-driven pipeline).
+
+Attempt-based standalone production script (player can replay)
+
+```js
+// Unit 3, Point 4 — Attempt-based standalone production script (latest attempt)
+// Trigger eventKey: "DialogueNodeEvent:73:200"
+
+const playerId = "wenyi10@mhs.mhs";
+
+const TRIGGER_KEY = "DialogueNodeEvent:73:200";
+
+const TARGET_KEYS = [
+  "DialogueNodeEvent:78:3", "DialogueNodeEvent:78:4", "DialogueNodeEvent:78:7",
+  "DialogueNodeEvent:78:9", "DialogueNodeEvent:78:10", "DialogueNodeEvent:78:12",
+  "DialogueNodeEvent:78:18", "DialogueNodeEvent:78:23"
+];
+
+// 1) Latest trigger (end anchor)
+const latestTrigger = db.logdata.findOne(
+  { game: "mhs", playerId: playerId, eventKey: TRIGGER_KEY },
+  { sort: { _id: -1 } }
+);
+
+if (!latestTrigger) {
+  "yellow";
+} else {
+  // 2) Previous trigger (attempt boundary)
+  const prevTrigger = db.logdata.findOne(
+    {
+      game: "mhs",
+      playerId: playerId,
+      eventKey: TRIGGER_KEY,
+      _id: { $lt: latestTrigger._id }
+    },
+    { sort: { _id: -1 } }
+  );
+
+  const windowStartId = prevTrigger ? prevTrigger._id : ObjectId("000000000000000000000000");
+  const windowEndId = latestTrigger._id;
+
+  // Gate: must have 78:24 within attempt window
+  const has7824 =
+    db.logdata.findOne(
+      {
+        game: "mhs",
+        playerId: playerId,
+        eventKey: "DialogueNodeEvent:78:24",
+        _id: { $gt: windowStartId, $lte: windowEndId }
+      },
+      { projection: { _id: 1 } }
+    ) !== null;
+
+  if (!has7824) {
+    "yellow";
+  } else {
+    const totalCount = db.logdata.countDocuments({
+      game: "mhs",
+      playerId: playerId,
+      eventKey: { $in: TARGET_KEYS },
+      _id: { $gt: windowStartId, $lte: windowEndId }
+    });
+
+    let score;
+    if (totalCount === 0) score = 2;
+    else if (totalCount <= 2) score = 1;
+    else score = 0;
+
+    score === 0 ? "yellow" : "green";
+  }
+}
+```
+
+This one’s nicely deterministic. The only “gotcha” to watch for in live data is whether 78:24 can occur after the trigger 73:200 in timestamp ordering; but since we’re using _id windowing around the trigger, it’ll be counted only if it occurs in the same attempt window.
+
+---
+
+## Unit 3, Point 5
+
+**Title:** Plant the superfruit seeds (Predict the spread of dissolved materials through a watershed)
+
+**Trigger:** `DialogueNodeEvent:10:194`
+
+### Data Analytics Script
+
+```python
+If has “DialogueNodeEvent:10:194":
+    pos_count = coll.count_documents({"playerId": pid, "eventKey": "DialogueNodeEvent:73:163"})
+
+    pos_score = pos_count * 1.0
+
+    NEG_KEYS = ["DialogueNodeEvent:73:164", "DialogueNodeEvent:73:168", "DialogueNodeEvent:73:171"]
+neg_count = coll.count_documents({"playerId": pid, "eventKey": {"$in": NEG_KEYS}})
+
+    neg_score = neg_count * 0.5
+
+    sum_score = pos_score - neg_score
+
+    return 2 #yellow if sum_score < 3 else 1 #green
+
+```
+
+Rule statement (matches analytics intent)
+- Count (over the player’s full history):
+- pos_count = count of DialogueNodeEvent:73:163
+- neg_count = count of events with eventKey in:
+- DialogueNodeEvent:73:164
+- DialogueNodeEvent:73:168
+- DialogueNodeEvent:73:171
+- Compute:
+- pos_score = pos_count * 1.0
+- neg_score = neg_count * 0.5
+- sum_score = pos_score - neg_score
+- If sum_score < 3 → yellow
+- Else → green
+
+The following script matches analytics intent.
+
+```js
+// Unit 3, Point 5 — Analytics-matching script
+// Trigger eventKey: "DialogueNodeEvent:10:194"
+
+const playerId = "wenyi10@mhs.mhs";
+
+const POS_KEY = "DialogueNodeEvent:73:163";
+const NEG_KEYS = ["DialogueNodeEvent:73:164", "DialogueNodeEvent:73:168", "DialogueNodeEvent:73:171"];
+
+const posCount = db.logdata.countDocuments({
+  game: "mhs",
+  playerId: playerId,
+  eventKey: POS_KEY
+});
+
+const negCount = db.logdata.countDocuments({
+  game: "mhs",
+  playerId: playerId,
+  eventKey: { $in: NEG_KEYS }
+});
+
+const posScore = posCount * 1.0;
+const negScore = negCount * 0.5;
+
+const sumScore = posScore - negScore;
+
+const color = sumScore < 3 ? "yellow" : "green";
+color;
+```
+
+### Unit 3 Point 5 Production Grading Script
+
+Rule statement (latest attempt only, replay-safe)
+- Define the attempt window as:
+ - previous DialogueNodeEvent:10:194 (exclusive) to latest DialogueNodeEvent:10:194 (inclusive), by _id
+- Within that window:
+ - pos_count = count of DialogueNodeEvent:73:163
+ - neg_count = count of NEG_KEYS
+ - sum_score = (pos_count * 1.0) - (neg_count * 0.5)
+- If sum_score < 3 → yellow else green
+- If no latest trigger exists → yellow (normally won’t run in your trigger-driven pipeline)
+
+Attempt-based standalone production script (player can replay)
+
+```js
+// Unit 3, Point 5 — Attempt-based standalone production script (latest attempt)
+// Trigger eventKey: "DialogueNodeEvent:10:194"
+
+const playerId = "wenyi10@mhs.mhs";
+
+const TRIGGER_KEY = "DialogueNodeEvent:10:194";
+const POS_KEY = "DialogueNodeEvent:73:163";
+const NEG_KEYS = ["DialogueNodeEvent:73:164", "DialogueNodeEvent:73:168", "DialogueNodeEvent:73:171"];
+
+// 1) Latest trigger (end anchor)
+const latestTrigger = db.logdata.findOne(
+  { game: "mhs", playerId: playerId, eventKey: TRIGGER_KEY },
+  { sort: { _id: -1 } }
+);
+
+if (!latestTrigger) {
+  "yellow";
+} else {
+  // 2) Previous trigger (attempt boundary)
+  const prevTrigger = db.logdata.findOne(
+    {
+      game: "mhs",
+      playerId: playerId,
+      eventKey: TRIGGER_KEY,
+      _id: { $lt: latestTrigger._id }
+    },
+    { sort: { _id: -1 } }
+  );
+
+  const windowStartId = prevTrigger ? prevTrigger._id : ObjectId("000000000000000000000000");
+  const windowEndId = latestTrigger._id;
+
+  const posCount = db.logdata.countDocuments({
+    game: "mhs",
+    playerId: playerId,
+    eventKey: POS_KEY,
+    _id: { $gt: windowStartId, $lte: windowEndId }
+  });
+
+  const negCount = db.logdata.countDocuments({
+    game: "mhs",
+    playerId: playerId,
+    eventKey: { $in: NEG_KEYS },
+    _id: { $gt: windowStartId, $lte: windowEndId }
+  });
+
+  const sumScore = (posCount * 1.0) - (negCount * 0.5);
+
+  sumScore < 3 ? "yellow" : "green";
+}
+```
+
+One minor implementation note: multiplying by 1.0 and 0.5 is enough to force floating-point behavior in JS anyway, but I kept it explicit to mirror the analytics script.
+---
+
