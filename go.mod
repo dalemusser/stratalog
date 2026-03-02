@@ -2,10 +2,8 @@ module github.com/dalemusser/stratalog
 
 go 1.24.1
 
-replace github.com/dalemusser/waffle => ../waffle
-
 require (
-	github.com/dalemusser/waffle v0.1.35
+	github.com/dalemusser/waffle v0.1.36
 	github.com/go-chi/chi/v5 v5.2.3
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/csrf v1.7.3
