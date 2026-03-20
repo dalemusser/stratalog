@@ -53,6 +53,10 @@ func (h *Handler) SetBroadcaster(b LogBroadcaster) {
 // SubmitHandler handles POST /api/log/submit and POST /logs (legacy) requests.
 // It accepts both single log entries and batch submissions.
 //
+// Identity field: accepts either "playerId" (legacy) or "user_id" (new).
+// If "user_id" is present and "playerId" is not, user_id is copied to playerId
+// for consistent storage. The "user_id" field is removed from the stored document.
+//
 // Single entry format:
 //
 //	{
@@ -112,6 +116,11 @@ func (h *Handler) handleSingleSubmit(w http.ResponseWriter, r *http.Request, raw
 		writeJSONError(w, r, "invalid 'game' value", "INVALID_GAME", http.StatusBadRequest)
 		return
 	}
+
+	// Normalize identity: accept "user_id" as alias for "playerId".
+	// If user_id is present and playerId is not, copy user_id to playerId
+	// so all stored data uses a consistent field name.
+	normalizePlayerID(raw)
 
 	// Add server timestamp - use "serverTimestamp" for backward compatibility with strata_log
 	now := time.Now().UTC()
@@ -198,6 +207,9 @@ func (h *Handler) handleBatchSubmit(w http.ResponseWriter, r *http.Request, raw 
 			return
 		}
 
+		// Normalize identity: accept "user_id" as alias for "playerId"
+		normalizePlayerID(entryMap)
+
 		// Add game and serverTimestamp to each entry (stored flat)
 		entryMap["game"] = game
 		entryMap["serverTimestamp"] = now
@@ -268,10 +280,14 @@ func (h *Handler) ListHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse query parameters
+	// Parse query parameters — accept "user_id" as alias for "playerId"
+	playerID := r.URL.Query().Get("playerId")
+	if playerID == "" {
+		playerID = r.URL.Query().Get("user_id")
+	}
 	params := LogQueryParams{
 		Game:      game,
-		PlayerID:  r.URL.Query().Get("playerId"),
+		PlayerID:  playerID,
 		EventType: r.URL.Query().Get("eventType"),
 	}
 
@@ -561,6 +577,20 @@ func (h *Handler) DownloadHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Content-Disposition", "attachment; filename=\""+filename+"\"")
 	_ = json.NewEncoder(w).Encode(entries)
+}
+
+// normalizePlayerID copies "user_id" to "playerId" if playerId is absent.
+// This allows new game builds to send "user_id" while keeping the stored
+// field name consistent for existing queries, grader, and dashboard.
+// If both are present, playerId takes precedence (no overwrite).
+func normalizePlayerID(m map[string]interface{}) {
+	_, hasPlayerID := m["playerId"]
+	userID, hasUserID := m["user_id"]
+	if hasUserID && !hasPlayerID {
+		m["playerId"] = userID
+	}
+	// Remove user_id from the stored document to avoid duplicate identity fields
+	delete(m, "user_id")
 }
 
 // writeJSONError writes a JSON error response.
