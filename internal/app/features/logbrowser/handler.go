@@ -58,7 +58,7 @@ func (h *Handler) Hub() *Hub {
 
 // ServeList renders the main log browser page.
 func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Medium())
+	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Long())
 	defer cancel()
 
 	// Load games
@@ -120,8 +120,8 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 		TotalAllLogs:      totalAllLogs,
 	}
 
-	// If game selected, load players with counts
-	if selectedGame != "" {
+	// If game selected and search provided, load players
+	if selectedGame != "" && playerSearch != "" {
 		players, total, err := h.store.ListPlayersWithCounts(ctx, selectedGame, playerSearch, page, defaultPlayerLimit)
 		if err != nil {
 			h.logger.Warn("failed to list players with counts", zap.Error(err))
@@ -244,7 +244,7 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 
 // ServePlayers handles GET /players - HTMX partial for players table.
 func (h *Handler) ServePlayers(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Medium())
+	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Long())
 	defer cancel()
 
 	game := r.URL.Query().Get("game")
@@ -275,7 +275,7 @@ func (h *Handler) ServePlayers(w http.ResponseWriter, r *http.Request) {
 		Limit:          limit,
 	}
 
-	if game == "" {
+	if game == "" || search == "" {
 		templates.RenderSnippet(w, "logbrowser/players_partial", data)
 		return
 	}
@@ -359,7 +359,7 @@ func (h *Handler) ServeGamePicker(w http.ResponseWriter, r *http.Request) {
 
 // ServeLogs handles GET /data - HTMX partial for logs list.
 func (h *Handler) ServeLogs(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Medium())
+	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Long())
 	defer cancel()
 
 	game := r.URL.Query().Get("game")
@@ -590,7 +590,7 @@ func (h *Handler) ServeRecentLogsStream(w http.ResponseWriter, r *http.Request) 
 
 // HandleDeletePlayerLogs handles POST /{game}/player/{playerID}/delete - delete all logs for a player.
 func (h *Handler) HandleDeletePlayerLogs(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Medium())
+	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Long())
 	defer cancel()
 
 	game := chi.URLParam(r, "game")

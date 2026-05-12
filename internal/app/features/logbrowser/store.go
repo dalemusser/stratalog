@@ -3,6 +3,7 @@ package logbrowser
 import (
 	"context"
 	"sort"
+	"strings"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -66,111 +67,143 @@ func (s *Store) ListGames(ctx context.Context) ([]string, error) {
 }
 
 // ListPlayersWithCounts returns players with their log counts for a game.
+// Optimized to avoid scanning the full collection twice:
+// - Without search: uses distinct() for player list (fast index scan), then
+//   counts per player only for the current page.
+// - With search: uses a single aggregation with early $limit.
 func (s *Store) ListPlayersWithCounts(ctx context.Context, game, search string, page, limit int) ([]UserWithCount, int64, error) {
 	coll := s.db.Collection(logdataCollection)
 
-	// Build match stage for game and optional search
-	match := bson.M{"game": game}
-	if search != "" {
-		match["playerId"] = bson.M{"$regex": primitive.Regex{Pattern: search, Options: "i"}}
+	if search == "" {
+		return s.listPlayersDistinct(ctx, coll, game, page, limit)
 	}
+	return s.listPlayersSearch(ctx, coll, game, search, page, limit)
+}
 
-	// Aggregation pipeline to get unique players with counts
-	// Use $ifNull to handle null/missing, giving us "" or the actual value
-	// This naturally groups null, missing, and "" together since they all become ""
-	pipeline := mongo.Pipeline{
-		{{Key: "$match", Value: match}},
-		{{Key: "$group", Value: bson.M{
-			"_id":   bson.M{"$ifNull": bson.A{"$playerId", ""}},
-			"count": bson.M{"$sum": 1},
-		}}},
-		{{Key: "$sort", Value: bson.D{{Key: "count", Value: -1}, {Key: "_id", Value: 1}}}},
-	}
-
-	// Get total count first
-	countPipeline := append(pipeline, bson.D{{Key: "$count", Value: "total"}})
-	countCur, err := coll.Aggregate(ctx, countPipeline)
+// listPlayersDistinct uses distinct() to get all player IDs for a game (fast index scan),
+// then counts logs for just the current page of players.
+func (s *Store) listPlayersDistinct(ctx context.Context, coll *mongo.Collection, game string, page, limit int) ([]UserWithCount, int64, error) {
+	// Get distinct player IDs — uses the idx_logdata_game_playerId index
+	values, err := coll.Distinct(ctx, "playerId", bson.M{"game": game})
 	if err != nil {
 		return nil, 0, err
 	}
-	defer countCur.Close(ctx)
 
-	var total int64
-	if countCur.Next(ctx) {
-		var result struct {
-			Total int64 `bson:"total"`
-		}
-		if err := countCur.Decode(&result); err == nil {
-			total = result.Total
-		}
+	// Collect and sort player IDs
+	var playerIDs []string
+	for _, v := range values {
+		id, _ := v.(string)
+		playerIDs = append(playerIDs, id)
 	}
+	sort.Strings(playerIDs)
 
-	// Add pagination
+	total := int64(len(playerIDs))
+
+	// Paginate the player list
 	skip := (page - 1) * limit
-	paginatedPipeline := append(pipeline,
-		bson.D{{Key: "$skip", Value: skip}},
-		bson.D{{Key: "$limit", Value: limit}},
-	)
-
-	cur, err := coll.Aggregate(ctx, paginatedPipeline)
-	if err != nil {
-		return nil, 0, err
+	if skip >= len(playerIDs) {
+		return nil, total, nil
 	}
-	defer cur.Close(ctx)
+	end := skip + limit
+	if end > len(playerIDs) {
+		end = len(playerIDs)
+	}
+	pageIDs := playerIDs[skip:end]
 
-	var results []UserWithCount
-	for cur.Next(ctx) {
-		var doc struct {
-			ID    string `bson:"_id"`
-			Count int64  `bson:"count"`
+	// Get counts for just the current page of players (small targeted queries)
+	results := make([]UserWithCount, len(pageIDs))
+	for i, pid := range pageIDs {
+		filter := bson.M{"game": game}
+		if pid == "" {
+			filter["$or"] = []bson.M{
+				{"playerId": nil},
+				{"playerId": ""},
+				{"playerId": bson.M{"$exists": false}},
+			}
+		} else {
+			filter["playerId"] = pid
 		}
-		if err := cur.Decode(&doc); err != nil {
-			continue
+		count, err := coll.CountDocuments(ctx, filter)
+		if err != nil {
+			s.logger.Warn("failed to count logs for player", zap.String("playerId", pid), zap.Error(err))
+			count = 0
 		}
-		results = append(results, UserWithCount{
-			PlayerID: doc.ID,
-			LogCount: doc.Count,
-		})
+		results[i] = UserWithCount{PlayerID: pid, LogCount: count}
 	}
 
 	return results, total, nil
 }
 
-// ListEventTypes returns all event types for a game with counts.
+// listPlayersSearch uses distinct() with client-side filtering for search.
+// Much faster than aggregation — uses the game+playerId index for distinct,
+// then filters and counts only the current page.
+func (s *Store) listPlayersSearch(ctx context.Context, coll *mongo.Collection, game, search string, page, limit int) ([]UserWithCount, int64, error) {
+	// Get distinct player IDs for this game — fast index scan
+	values, err := coll.Distinct(ctx, "playerId", bson.M{"game": game})
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// Filter client-side by starts-with (case-insensitive)
+	searchLower := strings.ToLower(search)
+	var matched []string
+	for _, v := range values {
+		id, _ := v.(string)
+		if strings.HasPrefix(strings.ToLower(id), searchLower) {
+			matched = append(matched, id)
+		}
+	}
+	sort.Strings(matched)
+
+	total := int64(len(matched))
+
+	// Paginate
+	skip := (page - 1) * limit
+	if skip >= len(matched) {
+		return nil, total, nil
+	}
+	end := skip + limit
+	if end > len(matched) {
+		end = len(matched)
+	}
+	pageIDs := matched[skip:end]
+
+	// Get counts for just the current page
+	results := make([]UserWithCount, len(pageIDs))
+	for i, pid := range pageIDs {
+		filter := bson.M{"game": game, "playerId": pid}
+		count, err := coll.CountDocuments(ctx, filter)
+		if err != nil {
+			count = 0
+		}
+		results[i] = UserWithCount{PlayerID: pid, LogCount: count}
+	}
+
+	return results, total, nil
+}
+
+// ListEventTypes returns all event types for a game.
+// Optimized: uses distinct() instead of aggregation to avoid full collection scan.
 func (s *Store) ListEventTypes(ctx context.Context, game string) ([]EventTypeItem, error) {
 	coll := s.db.Collection(logdataCollection)
 
-	pipeline := mongo.Pipeline{
-		{{Key: "$match", Value: bson.M{"game": game}}},
-		{{Key: "$group", Value: bson.M{
-			"_id":   "$eventType",
-			"count": bson.M{"$sum": 1},
-		}}},
-		{{Key: "$sort", Value: bson.D{{Key: "count", Value: -1}, {Key: "_id", Value: 1}}}},
-	}
-
-	cur, err := coll.Aggregate(ctx, pipeline)
+	// Use distinct for fast index scan — idx_logdata_game_eventType
+	values, err := coll.Distinct(ctx, "eventType", bson.M{"game": game})
 	if err != nil {
 		return nil, err
 	}
-	defer cur.Close(ctx)
 
 	var results []EventTypeItem
-	for cur.Next(ctx) {
-		var doc struct {
-			ID    string `bson:"_id"`
-			Count int64  `bson:"count"`
-		}
-		if err := cur.Decode(&doc); err != nil {
-			continue
-		}
-		if doc.ID != "" {
-			results = append(results, EventTypeItem{
-				Name:  doc.ID,
-				Count: doc.Count,
-			})
+	for _, v := range values {
+		name, _ := v.(string)
+		if name != "" {
+			results = append(results, EventTypeItem{Name: name})
 		}
 	}
+
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].Name < results[j].Name
+	})
 
 	return results, nil
 }
