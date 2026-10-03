@@ -1,7 +1,11 @@
 // internal/app/bootstrap/appconfig.go
 package bootstrap
 
-import "time"
+import (
+	"time"
+
+	"github.com/dalemusser/stratalog/internal/app/system/auth"
+)
 
 // AppConfig holds service-specific configuration for this WAFFLE app.
 //
@@ -61,6 +65,10 @@ type AppConfig struct {
 	// More than one lets a key be replaced without downtime (add the new key,
 	// move the clients to it, remove the old one).
 	APIKeys []string
+	// RestrictedAPIKey is a key accepted only for particular user ids: the
+	// key built into the game's source for running it without a host, held to
+	// the game's built-in developer user.
+	RestrictedAPIKey auth.RestrictedKey
 
 	// File storage configuration
 	StorageType      string // Storage backend: "local" or "s3"

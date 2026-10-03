@@ -308,7 +308,7 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 	})
 
 	// New API endpoints: POST /api/log/submit, GET /api/log/list
-	r.Mount("/api/log", logapifeature.Routes(logapiHandler, apiStatsRecorder, apiLedgerConfig, appCfg.APIKeys, logger))
+	r.Mount("/api/log", logapifeature.Routes(logapiHandler, apiStatsRecorder, apiLedgerConfig, appCfg.APIKeys, appCfg.RestrictedAPIKey, logger))
 
 	// Legacy endpoints for /logs (backward compatibility)
 	// - POST /logs - Submit log entries (requires API key)
@@ -328,7 +328,7 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 		// Authenticated endpoints (API key required)
 		r.Group(func(r chi.Router) {
 			r.Use(ledger.Middleware(apiLedgerConfig))
-			r.Use(auth.APIKeyAuth(appCfg.APIKeys, logger))
+			r.Use(auth.APIKeyAuthRestricted(appCfg.APIKeys, appCfg.RestrictedAPIKey, logger))
 			r.With(apistats.MiddlewareWithRecorder(apiStatsRecorder, apistatsstore.StatTypeLogSubmit)).Post("/", logapiHandler.SubmitHandler)
 			r.With(apistats.MiddlewareWithRecorder(apiStatsRecorder, apistatsstore.StatTypeLogList)).Get("/", logapiHandler.ListHandler)
 		})

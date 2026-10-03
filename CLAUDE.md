@@ -62,6 +62,7 @@ Environment variables use `STRATALOG_` prefix. See `bootstrap/config.go` and `bo
 Key config:
 - `STRATALOG_API_KEY`: Bearer token for API authentication
 - `STRATALOG_API_KEYS_EXTRA`: further Bearer tokens that are also accepted, comma-separated (to replace a key without downtime: add the new one here, move the clients, then make it `api_key` and drop the old one)
+- `STRATALOG_API_KEY_RESTRICTED` (+ `_USER_IDS`, `_ENFORCE`): a key accepted only for the listed user ids (default: the game's built-in developer user `000000000000000000000001`); for a key that cannot be kept secret because it is built into a game's source. With `_ENFORCE=false` other use is let through and logged instead of refused
 - `STRATALOG_MAX_BATCH_SIZE`: Max entries in batch submission (default: 100)
 - `STRATALOG_MAX_BODY_SIZE`: Max request body size (default: 1MB)
 

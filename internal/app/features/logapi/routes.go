@@ -13,14 +13,14 @@ import (
 // Mounted at /api/log:
 //   - POST /api/log/submit - Submit single or batch log entries
 //   - GET /api/log/list - List log entries with filters
-func Routes(h *Handler, statsRecorder *apistats.Recorder, ledgerConfig ledger.Config, apiKeys []string, logger *zap.Logger) chi.Router {
+func Routes(h *Handler, statsRecorder *apistats.Recorder, ledgerConfig ledger.Config, apiKeys []string, restricted auth.RestrictedKey, logger *zap.Logger) chi.Router {
 	r := chi.NewRouter()
 
 	// Ledger middleware for error logging
 	r.Use(ledger.Middleware(ledgerConfig))
 
 	// API key authentication middleware
-	r.Use(auth.APIKeyAuth(apiKeys, logger))
+	r.Use(auth.APIKeyAuthRestricted(apiKeys, restricted, logger))
 
 	// Submit endpoint
 	r.Route("/submit", func(r chi.Router) {
@@ -40,14 +40,14 @@ func Routes(h *Handler, statsRecorder *apistats.Recorder, ledgerConfig ledger.Co
 // Endpoints:
 //   - POST /logs - Submit single or batch log entries
 //   - GET /logs - List log entries with filters
-func LegacyRoutes(h *Handler, statsRecorder *apistats.Recorder, ledgerConfig ledger.Config, apiKeys []string, logger *zap.Logger) chi.Router {
+func LegacyRoutes(h *Handler, statsRecorder *apistats.Recorder, ledgerConfig ledger.Config, apiKeys []string, restricted auth.RestrictedKey, logger *zap.Logger) chi.Router {
 	r := chi.NewRouter()
 
 	// Ledger middleware for error logging
 	r.Use(ledger.Middleware(ledgerConfig))
 
 	// API key authentication middleware
-	r.Use(auth.APIKeyAuth(apiKeys, logger))
+	r.Use(auth.APIKeyAuthRestricted(apiKeys, restricted, logger))
 
 	// API stats recording
 	r.Route("/", func(r chi.Router) {

@@ -142,6 +142,18 @@ api_key = ""
 # api_key and remove the old one.
 api_keys_extra = ""
 
+# An API key accepted only for particular user ids. It is for a key that
+# cannot be kept secret, such as one built into a game's source for running
+# the game without a host: it may read and write the data of the game's
+# built-in developer user and nobody else's.
+api_key_restricted = ""
+# The user ids the restricted key may be used for, comma-separated.
+api_key_restricted_user_ids = "000000000000000000000001"
+# true: a request with the restricted key about any other user is refused
+# (403). false: it is let through and logged ("restricted API key used outside
+# its user ids"), which shows who still uses the key before refusing starts.
+api_key_restricted_enforce = true
+
 # Maximum number of entries in a batch log submission
 max_batch_size = 100
 

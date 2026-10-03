@@ -45,6 +45,9 @@ var appConfigKeys = []config.AppKey{
 	// API key configuration (for external API consumers using Bearer token auth)
 	{Name: "api_key", Default: "", Desc: "API key for external API access (leave empty to disable API key auth)"},
 	{Name: "api_keys_extra", Default: "", Desc: "Further API keys that are also accepted, comma-separated (for replacing a key without downtime)"},
+	{Name: "api_key_restricted", Default: "", Desc: "An API key accepted only for the user ids in api_key_restricted_user_ids (for a key that cannot be kept secret, such as one built into a game's source)"},
+	{Name: "api_key_restricted_user_ids", Default: "000000000000000000000001", Desc: "User ids the restricted API key may be used for, comma-separated (default: the game's built-in developer user)"},
+	{Name: "api_key_restricted_enforce", Default: true, Desc: "Refuse the restricted API key for any other user id (false: let the request through and log it)"},
 
 	// File storage configuration
 	{Name: "storage_type", Default: "local", Desc: "Storage backend: 'local' or 's3'"},
@@ -136,6 +139,11 @@ func LoadConfig(logger *zap.Logger) (*config.CoreConfig, AppConfig, error) {
 		CSRFKey: appValues.String("csrf_key"),
 		APIKey:           appValues.String("api_key"),
 		APIKeys:          auth.APIKeys(appValues.String("api_key"), appValues.String("api_keys_extra")),
+		RestrictedAPIKey: auth.RestrictedKey{
+			Key:     appValues.String("api_key_restricted"),
+			UserIDs: auth.SplitList(appValues.String("api_key_restricted_user_ids")),
+			Enforce: appValues.Bool("api_key_restricted_enforce"),
+		},
 
 		// File storage
 		StorageType:      appValues.String("storage_type"),

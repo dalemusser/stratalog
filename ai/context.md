@@ -97,6 +97,7 @@ func (s *Store) List(ctx context.Context, filter bson.M) ([]Entity, error) { ...
 - **Web UI:** Session-based authentication using `auth.CurrentUser(r)` helper
 - **Middleware:** `sessionMgr.RequireAuth`, `sessionMgr.RequireRole("admin")`
 - **Staff pages:** `/logs/view`, `/logs/download` require a console sign-in (admin or developer); nothing that returns log entries is public
+- **Restricted key:** `api_key_restricted` is accepted only for the user ids in `api_key_restricted_user_ids` (default: the game's built-in developer user); `api_key_restricted_enforce = false` logs other use instead of refusing it (`auth.APIKeyAuthRestricted`)
 - **Key replacement:** `api_keys_extra` (comma-separated) lists further accepted Bearer tokens, so a key can be replaced without downtime
 
 ### View Data
