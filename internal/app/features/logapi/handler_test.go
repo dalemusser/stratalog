@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dalemusser/stratalog/internal/app/system/auth"
+	"github.com/dalemusser/stratalog/internal/app/system/ledger"
 	"github.com/dalemusser/stratalog/internal/testutil"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.uber.org/zap"
@@ -135,5 +137,52 @@ func TestViewAndDownloadAreBounded(t *testing.T) {
 	}
 	if len(entries) != 120 {
 		t.Errorf("download with limit=120 returned %d entries, want 120", len(entries))
+	}
+}
+
+// While the log read routes are turned off, the list route answers 410
+// (after the key check) and submit is unaffected; turned on, list reaches
+// its handler.
+func TestRoutesReadSwitch(t *testing.T) {
+	h := NewHandler(nil, zap.NewNop(), 0) // no database: no request here gets as far as a query
+	get := func(router http.Handler, target, key string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodGet, target, nil)
+		if key != "" {
+			req.Header.Set("Authorization", "Bearer "+key)
+		}
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+		return rec
+	}
+
+	off := Routes(h, nil, ledger.Config{}, []string{"k"}, auth.RestrictedKey{}, false, zap.NewNop())
+	if rec := get(off, "/list?game=mhs", "k"); rec.Code != http.StatusGone || !strings.Contains(rec.Body.String(), "ENDPOINT_DISABLED") {
+		t.Errorf("list while off: status = %d body = %s, want 410 ENDPOINT_DISABLED", rec.Code, rec.Body.String())
+	}
+	if rec := get(off, "/list?game=mhs", ""); rec.Code != http.StatusUnauthorized {
+		t.Errorf("list while off, no key: status = %d, want 401", rec.Code)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/submit", strings.NewReader(`{"game":"mhs"}`))
+	req.Header.Set("Authorization", "Bearer k")
+	rec := httptest.NewRecorder()
+	off.ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("submit while off: status = %d, want 400 (reached the handler, entry has no user_id)", rec.Code)
+	}
+
+	on := Routes(h, nil, ledger.Config{}, []string{"k"}, auth.RestrictedKey{}, true, zap.NewNop())
+	if rec := get(on, "/list", "k"); rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "MISSING_PARAM") {
+		t.Errorf("list while on, no game: status = %d body = %s, want 400 MISSING_PARAM from the list handler", rec.Code, rec.Body.String())
+	}
+}
+
+func TestDisabledHandler(t *testing.T) {
+	h := NewHandler(nil, zap.NewNop(), 0)
+	for _, target := range []string{"/logs/view?game=mhs", "/logs/download?game=mhs&limit=0", "/logs?game=mhs"} {
+		rec := httptest.NewRecorder()
+		h.DisabledHandler(rec, httptest.NewRequest(http.MethodGet, target, nil))
+		if rec.Code != http.StatusGone {
+			t.Errorf("%s: status = %d, want %d", target, rec.Code, http.StatusGone)
+		}
 	}
 }

@@ -26,11 +26,18 @@
                 <input type="radio" name="operation" value="submit" checked class="text-indigo-600">
                 <span class="text-sm text-gray-700 dark:text-gray-300">Submit Log</span>
               </label>
+              {{ if .ListEnabled }}
               <label class="flex items-center gap-2 px-4 py-2 border dark:border-gray-600 rounded cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700">
                 <input type="radio" name="operation" value="list" class="text-indigo-600">
                 <span class="text-sm text-gray-700 dark:text-gray-300">List Logs</span>
               </label>
+              {{ end }}
             </div>
+            {{ if not .ListEnabled }}
+            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+              The list endpoint is turned off on this server. Use the <a href="/console/api/logs" class="underline">Log Browser</a> to look at entries.
+            </p>
+            {{ end }}
           </div>
 
           <!-- Endpoint Display -->

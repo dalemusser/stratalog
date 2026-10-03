@@ -49,6 +49,11 @@ var appConfigKeys = []config.AppKey{
 	{Name: "api_key_restricted_user_ids", Default: "000000000000000000000001", Desc: "User ids the restricted API key may be used for, comma-separated (default: the game's built-in developer user)"},
 	{Name: "api_key_restricted_enforce", Default: true, Desc: "Refuse the restricted API key for any other user id (false: let the request through and log it)"},
 
+	// The routes that read log entries over HTTP (GET /api/log/list, GET /logs,
+	// /logs/view, /logs/download). They were how developers looked at their
+	// game's entries before the console existed; the Log Browser replaces them.
+	{Name: "log_read_routes_enabled", Default: false, Desc: "Serve the routes that read log entries over HTTP (list, view, download); off by default, the console's Log Browser replaces them"},
+
 	// File storage configuration
 	{Name: "storage_type", Default: "local", Desc: "Storage backend: 'local' or 's3'"},
 	{Name: "storage_local_path", Default: "./uploads", Desc: "Local storage path for uploaded files"},
@@ -139,6 +144,7 @@ func LoadConfig(logger *zap.Logger) (*config.CoreConfig, AppConfig, error) {
 		CSRFKey: appValues.String("csrf_key"),
 		APIKey:           appValues.String("api_key"),
 		APIKeys:          auth.APIKeys(appValues.String("api_key"), appValues.String("api_keys_extra")),
+		LogReadRoutesEnabled: appValues.Bool("log_read_routes_enabled"),
 		RestrictedAPIKey: auth.RestrictedKey{
 			Key:     appValues.String("api_key_restricted"),
 			UserIDs: auth.SplitList(appValues.String("api_key_restricted_user_ids")),

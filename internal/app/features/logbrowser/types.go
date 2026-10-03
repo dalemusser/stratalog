@@ -45,9 +45,9 @@ type ListVM struct {
 	Limit        int // Alias for LogLimit, used by users_content template
 	DefaultLimit int
 	HasPrev      bool
-	HasNext    bool
-	PrevCursor string
-	NextCursor string
+	HasNext      bool
+	PrevCursor   string
+	NextCursor   string
 
 	// API configuration
 	APIKey string
@@ -133,13 +133,15 @@ type EventTypeItem struct {
 // PlaygroundVM is the view model for the API playground page.
 type PlaygroundVM struct {
 	viewdata.BaseVM
-	APIKey string
+	APIKey      string
+	ListEnabled bool // the list endpoint is served (config log_read_routes_enabled)
 }
 
 // DocsVM is the view model for the API documentation page.
 type DocsVM struct {
 	viewdata.BaseVM
-	MaxBatchSize int
+	MaxBatchSize      int
+	ReadRoutesEnabled bool // the list, view and download routes are served (config log_read_routes_enabled)
 }
 
 // RecentLogsVM is the view model for the recent logs page.

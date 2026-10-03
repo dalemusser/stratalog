@@ -293,7 +293,7 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 	logapiHandler := logapifeature.NewHandler(deps.MongoDatabase, logger, appCfg.MaxBatchSize)
 
 	// Log Browser Console (admin and developer) - create early so we can get the hub
-	logbrowserHandler := logbrowserfeature.NewHandler(deps.MongoDatabase, errLog, 25, appCfg.APIKey, logger)
+	logbrowserHandler := logbrowserfeature.NewHandler(deps.MongoDatabase, errLog, 25, appCfg.APIKey, appCfg.LogReadRoutesEnabled, logger)
 
 	// Wire up SSE broadcasting: when logs are submitted, broadcast to connected clients
 	logHub := logbrowserHandler.Hub()
@@ -308,29 +308,37 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 	})
 
 	// New API endpoints: POST /api/log/submit, GET /api/log/list
-	r.Mount("/api/log", logapifeature.Routes(logapiHandler, apiStatsRecorder, apiLedgerConfig, appCfg.APIKeys, appCfg.RestrictedAPIKey, logger))
+	r.Mount("/api/log", logapifeature.Routes(logapiHandler, apiStatsRecorder, apiLedgerConfig, appCfg.APIKeys, appCfg.RestrictedAPIKey, appCfg.LogReadRoutesEnabled, logger))
 
 	// Legacy endpoints for /logs (backward compatibility)
 	// - POST /logs - Submit log entries (requires API key)
 	// - GET /logs - List log entries (requires API key)
 	// - GET /logs/view?game=<name> - HTML view (console sign-in: admin or developer)
 	// - GET /logs/download?game=<name> - JSON download (console sign-in: admin or developer)
+	//
+	// The three GET routes (and GET /api/log/list) read log entries. They are
+	// served only with log_read_routes_enabled; otherwise each answers 410.
 	r.Route("/logs", func(r chi.Router) {
-		// Staff pages: they return the research log, so they need the same
-		// sign-in as the log browser. A browser without a session is sent to
-		// /login and back.
-		r.Group(func(r chi.Router) {
-			r.Use(sessionMgr.RequireRole("admin", "developer"))
-			r.Get("/view", logapiHandler.ViewHandler)
-			r.Get("/download", logapiHandler.DownloadHandler)
-		})
+		if appCfg.LogReadRoutesEnabled {
+			// Staff pages: they return the research log, so they need the same
+			// sign-in as the log browser. A browser without a session is sent
+			// to /login and back.
+			r.Group(func(r chi.Router) {
+				r.Use(sessionMgr.RequireRole("admin", "developer"))
+				r.Get("/view", logapiHandler.ViewHandler)
+				r.Get("/download", logapiHandler.DownloadHandler)
+			})
+		} else {
+			r.Get("/view", logapiHandler.DisabledHandler)
+			r.Get("/download", logapiHandler.DisabledHandler)
+		}
 
 		// Authenticated endpoints (API key required)
 		r.Group(func(r chi.Router) {
 			r.Use(ledger.Middleware(apiLedgerConfig))
 			r.Use(auth.APIKeyAuthRestricted(appCfg.APIKeys, appCfg.RestrictedAPIKey, logger))
 			r.With(apistats.MiddlewareWithRecorder(apiStatsRecorder, apistatsstore.StatTypeLogSubmit)).Post("/", logapiHandler.SubmitHandler)
-			r.With(apistats.MiddlewareWithRecorder(apiStatsRecorder, apistatsstore.StatTypeLogList)).Get("/", logapiHandler.ListHandler)
+			r.With(apistats.MiddlewareWithRecorder(apiStatsRecorder, apistatsstore.StatTypeLogList)).Get("/", logapiHandler.ListOrDisabled(appCfg.LogReadRoutesEnabled))
 		})
 	})
 

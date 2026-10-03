@@ -97,6 +97,8 @@ Batch entry:
 
 ### List Log Entries
 
+**Availability:** off by default (`log_read_routes_enabled`). While off the endpoint answers `410` with code `ENDPOINT_DISABLED`; use the console's Log Browser.
+
 Query log entries with filters.
 
 **Endpoint:** `GET /api/v1/logs` or `GET /logs`
@@ -158,6 +160,8 @@ GET /api/v1/logs?game=mygame&player_id=player001&limit=50
 
 ### View Logs (Staff)
 
+**Availability:** off by default (`log_read_routes_enabled`). While off the endpoint answers `410` with code `ENDPOINT_DISABLED`; use the console's Log Browser.
+
 View recent log entries as an HTML page.
 
 **Endpoint:** `GET /logs/view`
@@ -182,6 +186,8 @@ Returns an HTML page displaying the log entries.
 ---
 
 ### Download Logs (Staff)
+
+**Availability:** off by default (`log_read_routes_enabled`). While off the endpoint answers `410` with code `ENDPOINT_DISABLED`; use the console's Log Browser.
 
 Download log entries as a JSON file.
 

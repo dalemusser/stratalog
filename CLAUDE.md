@@ -47,6 +47,8 @@ Use `viewdata.New(r)` for minimal init or `viewdata.NewBaseVM(r, db, title, back
 - GET `/logs/view?game=<name>`: HTML view of logs (limit 100 by default, 1000 at most)
 - GET `/logs/download?game=<name>`: JSON download (limit 1000 by default, 10000 at most)
 
+The read routes (GET list, legacy GET `/logs`, `/logs/view`, `/logs/download`) are off by default (`log_read_routes_enabled`): each answers 410 and logs the request; the handlers stay in `features/logapi`. Submitting is unaffected.
+
 ### Log Browser (`/console/api/logs`)
 - View, search, filter logs by game/player/event type
 - Delete operations (admin only)
@@ -62,7 +64,9 @@ Environment variables use `STRATALOG_` prefix. See `bootstrap/config.go` and `bo
 Key config:
 - `STRATALOG_API_KEY`: Bearer token for API authentication
 - `STRATALOG_API_KEYS_EXTRA`: further Bearer tokens that are also accepted, comma-separated (to replace a key without downtime: add the new one here, move the clients, then make it `api_key` and drop the old one)
-- `STRATALOG_API_KEY_RESTRICTED` (+ `_USER_IDS`, `_ENFORCE`): a key accepted only for the listed user ids (default: the game's built-in developer user `000000000000000000000001`); for a key that cannot be kept secret because it is built into a game's source. With `_ENFORCE=false` other use is let through and logged instead of refused
+- `STRATALOG_API_KEY_RESTRICTED` (+ `_USER_IDS`, `_ENFORCE`): a key accepted only for the listed user ids (default: the game's built-in developer user `000000000000000000000001`); for a key that cannot be kept secret because it is built into a game's source. With `api_key_restricted_enforce = false` in the config file other use is let through and logged instead of refused
+- `log_read_routes_enabled` (config file): serve the routes that read log entries over HTTP (list, view, download); default false, the Log Browser replaces them
+- True/false settings are read from the config file only: one given as an environment variable arrives as text and is taken as false
 - `STRATALOG_MAX_BATCH_SIZE`: Max entries in batch submission (default: 100)
 - `STRATALOG_MAX_BODY_SIZE`: Max request body size (default: 1MB)
 

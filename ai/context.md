@@ -130,6 +130,8 @@ Initialize via `viewdata.New(r)` (minimal) or `viewdata.NewBaseVM(r, db, title, 
 
 ### Staff View and Download (console sign-in: admin or developer)
 
+Off by default together with the list endpoint (`log_read_routes_enabled`, default false): while off, `GET /api/log/list`, `GET /logs`, `/logs/view` and `/logs/download` answer 410 through `logapi.Handler.DisabledHandler`, which logs who asked. The handlers remain; the Log Browser is the way to read entries.
+
 - **GET** `/logs/view?game=<name>` — HTML view of recent logs
 - **GET** `/logs/download?game=<name>` — Download logs as JSON file
 

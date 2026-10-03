@@ -1,6 +1,8 @@
 package logapi
 
 import (
+	"net/http"
+
 	apistatsstore "github.com/dalemusser/stratalog/internal/app/store/apistats"
 	"github.com/dalemusser/stratalog/internal/app/system/apistats"
 	"github.com/dalemusser/stratalog/internal/app/system/auth"
@@ -12,8 +14,9 @@ import (
 // Routes returns the router for the new /api/log endpoints.
 // Mounted at /api/log:
 //   - POST /api/log/submit - Submit single or batch log entries
-//   - GET /api/log/list - List log entries with filters
-func Routes(h *Handler, statsRecorder *apistats.Recorder, ledgerConfig ledger.Config, apiKeys []string, restricted auth.RestrictedKey, logger *zap.Logger) chi.Router {
+//   - GET /api/log/list - List log entries with filters (only when
+//     readEnabled; otherwise it answers 410, see Handler.DisabledHandler)
+func Routes(h *Handler, statsRecorder *apistats.Recorder, ledgerConfig ledger.Config, apiKeys []string, restricted auth.RestrictedKey, readEnabled bool, logger *zap.Logger) chi.Router {
 	r := chi.NewRouter()
 
 	// Ledger middleware for error logging
@@ -29,7 +32,7 @@ func Routes(h *Handler, statsRecorder *apistats.Recorder, ledgerConfig ledger.Co
 
 	// List endpoint
 	r.Route("/list", func(r chi.Router) {
-		r.With(apistats.MiddlewareWithRecorder(statsRecorder, apistatsstore.StatTypeLogList)).Get("/", h.ListHandler)
+		r.With(apistats.MiddlewareWithRecorder(statsRecorder, apistatsstore.StatTypeLogList)).Get("/", h.listOrDisabled(readEnabled))
 	})
 
 	return r
@@ -40,7 +43,7 @@ func Routes(h *Handler, statsRecorder *apistats.Recorder, ledgerConfig ledger.Co
 // Endpoints:
 //   - POST /logs - Submit single or batch log entries
 //   - GET /logs - List log entries with filters
-func LegacyRoutes(h *Handler, statsRecorder *apistats.Recorder, ledgerConfig ledger.Config, apiKeys []string, restricted auth.RestrictedKey, logger *zap.Logger) chi.Router {
+func LegacyRoutes(h *Handler, statsRecorder *apistats.Recorder, ledgerConfig ledger.Config, apiKeys []string, restricted auth.RestrictedKey, readEnabled bool, logger *zap.Logger) chi.Router {
 	r := chi.NewRouter()
 
 	// Ledger middleware for error logging
@@ -52,8 +55,22 @@ func LegacyRoutes(h *Handler, statsRecorder *apistats.Recorder, ledgerConfig led
 	// API stats recording
 	r.Route("/", func(r chi.Router) {
 		r.With(apistats.MiddlewareWithRecorder(statsRecorder, apistatsstore.StatTypeLogSubmit)).Post("/", h.SubmitHandler)
-		r.With(apistats.MiddlewareWithRecorder(statsRecorder, apistatsstore.StatTypeLogList)).Get("/", h.ListHandler)
+		r.With(apistats.MiddlewareWithRecorder(statsRecorder, apistatsstore.StatTypeLogList)).Get("/", h.listOrDisabled(readEnabled))
 	})
 
 	return r
+}
+
+// listOrDisabled is the list handler while the log read routes are on, and
+// the 410 answer while they are off.
+func (h *Handler) listOrDisabled(readEnabled bool) http.HandlerFunc {
+	if readEnabled {
+		return h.ListHandler
+	}
+	return h.DisabledHandler
+}
+
+// ListOrDisabled is listOrDisabled for routes assembled outside this package.
+func (h *Handler) ListOrDisabled(readEnabled bool) http.HandlerFunc {
+	return h.listOrDisabled(readEnabled)
 }

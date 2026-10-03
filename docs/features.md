@@ -32,6 +32,8 @@ The core feature of StrataLog is a REST API for submitting and querying game log
 | `/logs/view` | GET | Console sign-in (admin, developer) | HTML view of recent logs |
 | `/logs/download` | GET | Console sign-in (admin, developer) | JSON download of recent logs |
 
+The routes that read log entries (the list endpoint `GET /api/log/list` and its legacy form `GET /logs`, `/logs/view`, `/logs/download`) are **off by default**: each answers `410` (`ENDPOINT_DISABLED`) and the request is logged. They were how developers looked at a game's entries before the console existed; the console's Log Browser replaces them. Set `log_read_routes_enabled = true` to serve them again.
+
 ### Single Entry Submission
 
 Submit individual log entries with flexible schema:

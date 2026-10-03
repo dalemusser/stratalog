@@ -26,28 +26,30 @@ const (
 
 // Handler handles log browser HTTP requests.
 type Handler struct {
-	db           *mongo.Database
-	store        *Store
-	errLog       *errorsfeature.ErrorLogger
-	logger       *zap.Logger
-	defaultLimit int
-	apiKey       string
-	hub          *Hub
+	db                   *mongo.Database
+	store                *Store
+	errLog               *errorsfeature.ErrorLogger
+	logger               *zap.Logger
+	defaultLimit         int
+	apiKey               string
+	logReadRoutesEnabled bool // whether the list/view/download routes are served (shown on the playground and docs pages)
+	hub                  *Hub
 }
 
 // NewHandler creates a new log browser handler.
-func NewHandler(db *mongo.Database, errLog *errorsfeature.ErrorLogger, defaultLimit int, apiKey string, logger *zap.Logger) *Handler {
+func NewHandler(db *mongo.Database, errLog *errorsfeature.ErrorLogger, defaultLimit int, apiKey string, logReadRoutesEnabled bool, logger *zap.Logger) *Handler {
 	if defaultLimit <= 0 {
 		defaultLimit = defaultLogLimit
 	}
 	return &Handler{
-		db:           db,
-		store:        NewStore(db, logger),
-		errLog:       errLog,
-		logger:       logger,
-		defaultLimit: defaultLimit,
-		apiKey:       apiKey,
-		hub:          NewHub(),
+		db:                   db,
+		store:                NewStore(db, logger),
+		errLog:               errLog,
+		logger:               logger,
+		defaultLimit:         defaultLimit,
+		apiKey:               apiKey,
+		logReadRoutesEnabled: logReadRoutesEnabled,
+		hub:                  NewHub(),
 	}
 }
 
@@ -442,8 +444,9 @@ func (h *Handler) HandleDeleteLog(w http.ResponseWriter, r *http.Request) {
 // ServePlayground renders the API playground page.
 func (h *Handler) ServePlayground(w http.ResponseWriter, r *http.Request) {
 	data := PlaygroundVM{
-		BaseVM: viewdata.NewBaseVM(r, h.db, "Log API Playground", "/console/api/logs"),
-		APIKey: h.apiKey,
+		BaseVM:      viewdata.NewBaseVM(r, h.db, "Log API Playground", "/console/api/logs"),
+		APIKey:      h.apiKey,
+		ListEnabled: h.logReadRoutesEnabled,
 	}
 	templates.Render(w, r, "logbrowser/playground", data)
 }
@@ -451,8 +454,9 @@ func (h *Handler) ServePlayground(w http.ResponseWriter, r *http.Request) {
 // ServeDocs renders the API documentation page.
 func (h *Handler) ServeDocs(w http.ResponseWriter, r *http.Request) {
 	data := DocsVM{
-		BaseVM:       viewdata.NewBaseVM(r, h.db, "Log API Documentation", "/console/api/logs"),
-		MaxBatchSize: 100,
+		BaseVM:            viewdata.NewBaseVM(r, h.db, "Log API Documentation", "/console/api/logs"),
+		MaxBatchSize:      100,
+		ReadRoutesEnabled: h.logReadRoutesEnabled,
 	}
 	templates.Render(w, r, "logbrowser/docs", data)
 }

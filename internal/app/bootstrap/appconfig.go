@@ -70,6 +70,12 @@ type AppConfig struct {
 	// the game's built-in developer user.
 	RestrictedAPIKey auth.RestrictedKey
 
+	// LogReadRoutesEnabled serves the routes that read log entries over HTTP:
+	// GET /api/log/list, GET /logs, /logs/view and /logs/download. Off by
+	// default: they predate the console, whose Log Browser replaces them.
+	// While off, each answers 410 and the request is logged.
+	LogReadRoutesEnabled bool
+
 	// File storage configuration
 	StorageType      string // Storage backend: "local" or "s3"
 	StorageLocalPath string // Local storage path (e.g., "./uploads")

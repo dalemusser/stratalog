@@ -154,6 +154,11 @@ api_key_restricted_user_ids = "000000000000000000000001"
 # its user ids"), which shows who still uses the key before refusing starts.
 api_key_restricted_enforce = true
 
+# Serve the routes that read log entries over HTTP: GET /api/log/list, GET
+# /logs, /logs/view and /logs/download. They predate the console, whose Log
+# Browser replaces them. While off, each answers 410 and the request is logged.
+log_read_routes_enabled = false
+
 # Maximum number of entries in a batch log submission
 max_batch_size = 100
 

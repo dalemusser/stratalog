@@ -182,6 +182,7 @@ rate_limit_enabled = false
 | `api_keys_extra` | string | `""` | Further accepted API keys, comma-separated; lets a key be replaced without downtime (add the new key here, move the clients, then make it `api_key` and remove the old one) |
 | `api_key_restricted` | string | `""` | An API key accepted only for the user ids in `api_key_restricted_user_ids`. For a key that cannot be kept secret (one built into a game's source for running it without a host) |
 | `api_key_restricted_user_ids` | string | `"000000000000000000000001"` | User ids the restricted key may be used for, comma-separated (default: the game's built-in developer user) |
+| `log_read_routes_enabled` | bool | `false` | Serve the routes that read log entries over HTTP (`GET /api/log/list`, `GET /logs`, `/logs/view`, `/logs/download`). Off by default: they answer `410` and the request is logged; the console's Log Browser replaces them |
 | `api_key_restricted_enforce` | bool | `true` | Refuse the restricted key for any other user id (403). `false` lets the request through and logs it, to see who still uses the key before refusing starts |
 
 ---

@@ -328,6 +328,19 @@ func (h *Handler) handleBatchSubmit(w http.ResponseWriter, r *http.Request, raw 
 	})
 }
 
+// DisabledHandler answers for a log read route (list, view, download) while
+// those routes are turned off (config log_read_routes_enabled): 410, and a
+// log line saying who asked, so any remaining use shows up.
+func (h *Handler) DisabledHandler(w http.ResponseWriter, r *http.Request) {
+	h.logger.Info("disabled log read route requested",
+		zap.String("path", r.URL.Path),
+		zap.String("game", r.URL.Query().Get("game")),
+		zap.String("remote_addr", r.RemoteAddr),
+		zap.String("user_agent", r.UserAgent()),
+	)
+	writeJSONError(w, r, "This endpoint is turned off. Log entries are available in the console's Log Browser.", "ENDPOINT_DISABLED", http.StatusGone)
+}
+
 // ListHandler handles GET /logs and GET /api/v1/logs requests.
 // Query parameters:
 //   - game (required): Filter by game name
