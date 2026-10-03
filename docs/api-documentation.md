@@ -156,13 +156,13 @@ GET /api/v1/logs?game=mygame&player_id=player001&limit=50
 
 ---
 
-### View Logs (Public)
+### View Logs (Staff)
 
 View recent log entries as an HTML page.
 
 **Endpoint:** `GET /logs/view`
 
-**Authentication:** Not required
+**Authentication:** Console sign-in as an admin or developer (a browser without a session is sent to `/login`). The API key does not open this page; use `GET /api/log/list` for programmatic access.
 
 #### Query Parameters
 
@@ -181,13 +181,13 @@ Returns an HTML page displaying the log entries.
 
 ---
 
-### Download Logs (Public)
+### Download Logs (Staff)
 
 Download log entries as a JSON file.
 
 **Endpoint:** `GET /logs/download`
 
-**Authentication:** Not required
+**Authentication:** Console sign-in as an admin or developer (a browser without a session is sent to `/login`). The API key does not open this page; use `GET /api/log/list` for programmatic access.
 
 #### Query Parameters
 

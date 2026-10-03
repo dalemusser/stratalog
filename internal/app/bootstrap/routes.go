@@ -250,7 +250,7 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 			// - Log API routes (use API key auth)
 			// - Heartbeat API (internal JS calls with session auth)
 			// - Invitation acceptance (the invitation token itself provides CSRF protection)
-			// - Public log view/download endpoints (no auth required)
+			// - Log view/download pages (GET only; nothing to protect)
 			if path == "/api/heartbeat" || path == "/invite" ||
 				strings.HasPrefix(path, "/logs") || strings.HasPrefix(path, "/api/log/") {
 				next.ServeHTTP(w, req)
@@ -308,22 +308,27 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 	})
 
 	// New API endpoints: POST /api/log/submit, GET /api/log/list
-	r.Mount("/api/log", logapifeature.Routes(logapiHandler, apiStatsRecorder, apiLedgerConfig, appCfg.APIKey, logger))
+	r.Mount("/api/log", logapifeature.Routes(logapiHandler, apiStatsRecorder, apiLedgerConfig, appCfg.APIKeys, logger))
 
 	// Legacy endpoints for /logs (backward compatibility)
 	// - POST /logs - Submit log entries (requires API key)
 	// - GET /logs - List log entries (requires API key)
-	// - GET /logs/view?game=<name> - HTML view (public, no auth)
-	// - GET /logs/download?game=<name> - JSON download (public, no auth)
+	// - GET /logs/view?game=<name> - HTML view (console sign-in: admin or developer)
+	// - GET /logs/download?game=<name> - JSON download (console sign-in: admin or developer)
 	r.Route("/logs", func(r chi.Router) {
-		// Public endpoints (no auth)
-		r.Get("/view", logapiHandler.ViewHandler)
-		r.Get("/download", logapiHandler.DownloadHandler)
+		// Staff pages: they return the research log, so they need the same
+		// sign-in as the log browser. A browser without a session is sent to
+		// /login and back.
+		r.Group(func(r chi.Router) {
+			r.Use(sessionMgr.RequireRole("admin", "developer"))
+			r.Get("/view", logapiHandler.ViewHandler)
+			r.Get("/download", logapiHandler.DownloadHandler)
+		})
 
 		// Authenticated endpoints (API key required)
 		r.Group(func(r chi.Router) {
 			r.Use(ledger.Middleware(apiLedgerConfig))
-			r.Use(auth.APIKeyAuth(appCfg.APIKey, logger))
+			r.Use(auth.APIKeyAuth(appCfg.APIKeys, logger))
 			r.With(apistats.MiddlewareWithRecorder(apiStatsRecorder, apistatsstore.StatTypeLogSubmit)).Post("/", logapiHandler.SubmitHandler)
 			r.With(apistats.MiddlewareWithRecorder(apiStatsRecorder, apistatsstore.StatTypeLogList)).Get("/", logapiHandler.ListHandler)
 		})

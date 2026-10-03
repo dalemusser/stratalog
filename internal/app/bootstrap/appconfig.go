@@ -57,6 +57,10 @@ type AppConfig struct {
 	// When set, enables Bearer token authentication for /api/* routes.
 	// Leave empty to disable API key authentication.
 	APIKey string
+	// Every accepted API key: APIKey first, then the keys of api_keys_extra.
+	// More than one lets a key be replaced without downtime (add the new key,
+	// move the clients to it, remove the old one).
+	APIKeys []string
 
 	// File storage configuration
 	StorageType      string // Storage backend: "local" or "s3"

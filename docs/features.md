@@ -29,8 +29,8 @@ The core feature of StrataLog is a REST API for submitting and querying game log
 | `/api/v1/logs` | GET | Bearer | Query log entries |
 | `/logs` | POST | Bearer | Legacy submit endpoint |
 | `/logs` | GET | Bearer | Legacy query endpoint |
-| `/logs/view` | GET | None | Public HTML view |
-| `/logs/download` | GET | None | Public JSON download |
+| `/logs/view` | GET | Console sign-in (admin, developer) | HTML view of recent logs |
+| `/logs/download` | GET | Console sign-in (admin, developer) | JSON download of recent logs |
 
 ### Single Entry Submission
 

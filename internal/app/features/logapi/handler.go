@@ -3,6 +3,7 @@ package logapi
 import (
 	"context"
 	"encoding/json"
+	"html"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -25,6 +26,31 @@ var userIDRegex = regexp.MustCompile(`^[0-9a-f]{24}$`)
 
 // logdataCollection is the unified collection name for all log data.
 const logdataCollection = "logdata"
+
+// The most entries the staff view and download pages return in one request.
+// Both read the whole result into memory, so neither is unbounded; a larger
+// export goes through the log browser's per-user download or the database.
+const (
+	viewDefaultLimit     = 100
+	viewMaxLimit         = 1000
+	downloadDefaultLimit = 1000
+	downloadMaxLimit     = 10000
+)
+
+// pageLimit reads the "limit" query parameter: def when it is absent or not
+// a positive number, never more than max.
+func pageLimit(r *http.Request, def, max int) int {
+	limit := def
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if n, err := strconv.Atoi(l); err == nil && n > 0 {
+			limit = n
+		}
+	}
+	if limit > max {
+		limit = max
+	}
+	return limit
+}
 
 // LogBroadcaster is a function that broadcasts log events to SSE subscribers.
 type LogBroadcaster func(game, userID, eventType string, serverTimestamp time.Time, data map[string]interface{})
@@ -465,30 +491,28 @@ func (h *Handler) ensureIndexes() {
 	}
 }
 
-// ViewHandler handles GET /logs/view?game=<name> requests.
-// This is a public endpoint (no authentication required) that returns an HTML view of logs.
+// ViewHandler handles GET /logs/view?game=<name> requests: an HTML view of
+// the newest entries (limit: 100 by default, 1000 at most). The route
+// requires a console sign-in (admin or developer).
 func (h *Handler) ViewHandler(w http.ResponseWriter, r *http.Request) {
 	game := r.URL.Query().Get("game")
 	if game == "" {
 		http.Error(w, "Missing required parameter: game", http.StatusBadRequest)
 		return
 	}
-
-	limit := 100
-	if l := r.URL.Query().Get("limit"); l != "" {
-		if n, err := strconv.Atoi(l); err == nil && n >= 0 {
-			limit = n
-		}
+	if !gameRegex.MatchString(game) {
+		http.Error(w, "Invalid parameter: game", http.StatusBadRequest)
+		return
 	}
+
+	limit := pageLimit(r, viewDefaultLimit, viewMaxLimit)
 
 	coll := h.db.Collection(logdataCollection)
 	filter := bson.M{"game": game}
 
 	opts := options.Find().
-		SetSort(bson.D{{Key: "serverTimestamp", Value: -1}})
-	if limit > 0 {
-		opts.SetLimit(int64(limit))
-	}
+		SetSort(bson.D{{Key: "serverTimestamp", Value: -1}}).
+		SetLimit(int64(limit))
 
 	cur, err := coll.Find(r.Context(), filter, opts)
 	if err != nil {
@@ -517,7 +541,7 @@ func (h *Handler) ViewHandler(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte(`<!DOCTYPE html>
 <html>
 <head>
-<title>Logs for ` + game + `</title>
+<title>Logs for ` + html.EscapeString(game) + `</title>
 <style>
 body { font-family: monospace; padding: 20px; }
 h1 { margin-bottom: 20px; }
@@ -529,7 +553,7 @@ h1 { margin-bottom: 20px; }
 </style>
 </head>
 <body>
-<h1>Logs for "` + game + `"</h1>
+<h1>Logs for "` + html.EscapeString(game) + `"</h1>
 <p>Showing ` + strconv.Itoa(len(entries)) + ` entries</p>
 `))
 
@@ -537,14 +561,14 @@ h1 { margin-bottom: 20px; }
 		_, _ = w.Write([]byte(`<div class="entry">`))
 		_, _ = w.Write([]byte(`<span class="timestamp">` + entry.ServerTimestamp.Format(time.RFC3339) + `</span>`))
 		if entry.EventType != "" {
-			_, _ = w.Write([]byte(` <span class="event-type">[` + entry.EventType + `]</span>`))
+			_, _ = w.Write([]byte(` <span class="event-type">[` + html.EscapeString(entry.EventType) + `]</span>`))
 		}
 		if entry.UserID != "" {
-			_, _ = w.Write([]byte(` <span class="user-id">User: ` + entry.UserID + `</span>`))
+			_, _ = w.Write([]byte(` <span class="user-id">User: ` + html.EscapeString(entry.UserID) + `</span>`))
 		}
 		if len(entry.Data) > 0 {
 			dataJSON, _ := json.MarshalIndent(entry.Data, "", "  ")
-			_, _ = w.Write([]byte(`<div class="data">` + string(dataJSON) + `</div>`))
+			_, _ = w.Write([]byte(`<div class="data">` + html.EscapeString(string(dataJSON)) + `</div>`))
 		}
 		_, _ = w.Write([]byte(`</div>`))
 	}
@@ -552,30 +576,28 @@ h1 { margin-bottom: 20px; }
 	_, _ = w.Write([]byte(`</body></html>`))
 }
 
-// DownloadHandler handles GET /logs/download?game=<name> requests.
-// This is a public endpoint (no authentication required) that returns logs as a JSON download.
+// DownloadHandler handles GET /logs/download?game=<name> requests: the
+// newest entries as a JSON download (limit: 1000 by default, 10000 at most).
+// The route requires a console sign-in (admin or developer).
 func (h *Handler) DownloadHandler(w http.ResponseWriter, r *http.Request) {
 	game := r.URL.Query().Get("game")
 	if game == "" {
 		writeJSONError(w, r, "Missing required parameter: game", "MISSING_PARAM", http.StatusBadRequest)
 		return
 	}
-
-	limit := 1000
-	if l := r.URL.Query().Get("limit"); l != "" {
-		if n, err := strconv.Atoi(l); err == nil && n >= 0 {
-			limit = n
-		}
+	if !gameRegex.MatchString(game) {
+		writeJSONError(w, r, "invalid 'game' value", "INVALID_GAME", http.StatusBadRequest)
+		return
 	}
+
+	limit := pageLimit(r, downloadDefaultLimit, downloadMaxLimit)
 
 	coll := h.db.Collection(logdataCollection)
 	filter := bson.M{"game": game}
 
 	opts := options.Find().
-		SetSort(bson.D{{Key: "serverTimestamp", Value: -1}})
-	if limit > 0 {
-		opts.SetLimit(int64(limit))
-	}
+		SetSort(bson.D{{Key: "serverTimestamp", Value: -1}}).
+		SetLimit(int64(limit))
 
 	cur, err := coll.Find(r.Context(), filter, opts)
 	if err != nil {

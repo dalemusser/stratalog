@@ -137,6 +137,11 @@ rate_limit_login_lockout = "15m"
 # Leave empty to disable API access
 api_key = ""
 
+# Further API keys that are also accepted, comma-separated. To replace a key
+# without downtime: add the new key here, move the clients to it, then make it
+# api_key and remove the old one.
+api_keys_extra = ""
+
 # Maximum number of entries in a batch log submission
 max_batch_size = 100
 

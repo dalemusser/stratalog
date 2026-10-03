@@ -10,7 +10,7 @@ StrataLog is a game logging service that stores player event logs with flexible 
 - **Log Browser**: View, search, and filter logs by game, player, or event type
 - **API Playground**: Interactive API testing interface with live request/response
 - **API Documentation**: Built-in API reference documentation
-- **Public Endpoints**: View and download logs without authentication
+- **Staff View and Download**: View and download recent logs after signing in to the console
 - **API Statistics**: Track request counts, response times, and error rates
 
 ## API Endpoints
@@ -24,7 +24,7 @@ StrataLog is a game logging service that stores player event logs with flexible 
 | `POST` | `/logs` | Legacy endpoint for log submission |
 | `GET` | `/logs` | Legacy endpoint for log queries |
 
-### Public (no authentication)
+### Staff pages (console sign-in: admin or developer)
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -128,8 +128,8 @@ curl -X POST http://localhost:8080/api/v1/logs \
 curl -X GET "http://localhost:8080/api/v1/logs?game=test&limit=10" \
   -H "Authorization: Bearer your-api-key"
 
-# View logs (public, no auth)
-curl http://localhost:8080/logs/view?game=test
+# View logs: open in a browser signed in to the console as an admin or developer
+#   http://localhost:8080/logs/view?game=test
 ```
 
 ## Configuration

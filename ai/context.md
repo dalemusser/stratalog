@@ -96,7 +96,8 @@ func (s *Store) List(ctx context.Context, filter bson.M) ([]Entity, error) { ...
 - **API endpoints:** Require Bearer token (set via `STRATALOG_API_KEY` config)
 - **Web UI:** Session-based authentication using `auth.CurrentUser(r)` helper
 - **Middleware:** `sessionMgr.RequireAuth`, `sessionMgr.RequireRole("admin")`
-- **Public endpoints:** `/logs/view`, `/logs/download` require no authentication
+- **Staff pages:** `/logs/view`, `/logs/download` require a console sign-in (admin or developer); nothing that returns log entries is public
+- **Key replacement:** `api_keys_extra` (comma-separated) lists further accepted Bearer tokens, so a key can be replaced without downtime
 
 ### View Data
 
@@ -126,7 +127,7 @@ Initialize via `viewdata.New(r)` (minimal) or `viewdata.NewBaseVM(r, db, title, 
 - **GET** `/console/api/logs/playground` — Interactive API testing
 - **GET** `/console/api/logs/docs` — API reference documentation
 
-### Public Endpoints (No Auth)
+### Staff View and Download (console sign-in: admin or developer)
 
 - **GET** `/logs/view?game=<name>` — HTML view of recent logs
 - **GET** `/logs/download?game=<name>` — Download logs as JSON file

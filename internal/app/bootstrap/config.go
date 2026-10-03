@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/dalemusser/stratalog/internal/app/system/auth"
 	"github.com/dalemusser/waffle/config"
 	wafflemongo "github.com/dalemusser/waffle/pantry/mongo"
 	"go.uber.org/zap"
@@ -43,6 +44,7 @@ var appConfigKeys = []config.AppKey{
 
 	// API key configuration (for external API consumers using Bearer token auth)
 	{Name: "api_key", Default: "", Desc: "API key for external API access (leave empty to disable API key auth)"},
+	{Name: "api_keys_extra", Default: "", Desc: "Further API keys that are also accepted, comma-separated (for replacing a key without downtime)"},
 
 	// File storage configuration
 	{Name: "storage_type", Default: "local", Desc: "Storage backend: 'local' or 's3'"},
@@ -133,6 +135,7 @@ func LoadConfig(logger *zap.Logger) (*config.CoreConfig, AppConfig, error) {
 
 		CSRFKey: appValues.String("csrf_key"),
 		APIKey:           appValues.String("api_key"),
+		APIKeys:          auth.APIKeys(appValues.String("api_key"), appValues.String("api_keys_extra")),
 
 		// File storage
 		StorageType:      appValues.String("storage_type"),

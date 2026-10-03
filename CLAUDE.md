@@ -43,9 +43,9 @@ Use `viewdata.New(r)` for minimal init or `viewdata.NewBaseVM(r, db, title, back
 - GET `/api/log/list?game=<name>`: Query logs with filters (Bearer token auth)
 - Legacy: POST/GET `/logs` (backward compatible)
 
-### Public Endpoints
-- GET `/logs/view?game=<name>`: HTML view of logs (no auth)
-- GET `/logs/download?game=<name>`: JSON download (no auth)
+### Staff View and Download (console sign-in: admin or developer)
+- GET `/logs/view?game=<name>`: HTML view of logs (limit 100 by default, 1000 at most)
+- GET `/logs/download?game=<name>`: JSON download (limit 1000 by default, 10000 at most)
 
 ### Log Browser (`/console/api/logs`)
 - View, search, filter logs by game/player/event type
@@ -61,6 +61,7 @@ Environment variables use `STRATALOG_` prefix. See `bootstrap/config.go` and `bo
 
 Key config:
 - `STRATALOG_API_KEY`: Bearer token for API authentication
+- `STRATALOG_API_KEYS_EXTRA`: further Bearer tokens that are also accepted, comma-separated (to replace a key without downtime: add the new one here, move the clients, then make it `api_key` and drop the old one)
 - `STRATALOG_MAX_BATCH_SIZE`: Max entries in batch submission (default: 100)
 - `STRATALOG_MAX_BODY_SIZE`: Max request body size (default: 1MB)
 
