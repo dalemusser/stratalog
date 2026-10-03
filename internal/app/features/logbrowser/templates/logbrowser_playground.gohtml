@@ -74,10 +74,10 @@
 
           <!-- Submit fields -->
           <div id="submit-fields">
-            <!-- Player ID -->
+            <!-- User ID -->
             <div class="mb-4">
-              <label for="playerId" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Player ID</label>
-              <input type="text" id="playerId" name="playerId" placeholder="Enter player ID"
+              <label for="user_id" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">User ID</label>
+              <input type="text" id="user_id" name="user_id" placeholder="Enter user.ID"
                      class="w-full px-3 py-2 text-sm border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded focus:outline-none focus:ring-2 focus:ring-indigo-400">
             </div>
 
@@ -98,10 +98,10 @@
 
           <!-- List fields -->
           <div id="list-fields" class="hidden">
-            <!-- Player ID Filter -->
+            <!-- User ID Filter -->
             <div class="mb-4">
-              <label for="filter_playerId" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Player ID (optional)</label>
-              <input type="text" id="filter_playerId" name="filter_playerId" placeholder="Filter by player"
+              <label for="filter_user_id" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">User ID (optional)</label>
+              <input type="text" id="filter_user_id" name="filter_user_id" placeholder="Filter by user_id"
                      class="w-full px-3 py-2 text-sm border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded focus:outline-none focus:ring-2 focus:ring-indigo-400">
             </div>
 
@@ -141,7 +141,7 @@
           <pre id="curl-example" class="text-xs font-mono bg-gray-50 dark:bg-gray-900 p-3 rounded overflow-x-auto text-gray-700 dark:text-gray-300">curl -X POST /api/log/submit \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"game":"mhs","playerId":"player001","eventType":"level_complete","level":5}'</pre>
+  -d '{"game":"mhs","user_id":"69b4449ec6006ac370dad9df","eventType":"level_complete","level":5}'</pre>
         </div>
       </div>
     </div>
@@ -212,12 +212,12 @@ function updateCurlExample() {
   var curlEl = document.getElementById('curl-example');
 
   if (operation === 'submit') {
-    var playerId = document.getElementById('playerId').value || 'player001';
+    var user_id = document.getElementById('user_id').value || '69b4449ec6006ac370dad9df';
     var eventType = document.getElementById('eventType').value || 'level_complete';
     curlEl.textContent = `curl -X POST /api/log/submit \\
   -H "Authorization: Bearer YOUR_API_KEY" \\
   -H "Content-Type: application/json" \\
-  -d '{"game":"${game}","playerId":"${playerId}","eventType":"${eventType}"}'`;
+  -d '{"game":"${game}","user_id":"${user_id}","eventType":"${eventType}"}'`;
   } else {
     curlEl.textContent = `curl -X GET "/api/log/list?game=${game}" \\
   -H "Authorization: Bearer YOUR_API_KEY"`;
@@ -225,7 +225,7 @@ function updateCurlExample() {
 }
 
 // Update curl on input changes
-['game', 'playerId', 'eventType'].forEach(function(id) {
+['game', 'user_id', 'eventType'].forEach(function(id) {
   var el = document.getElementById(id);
   if (el) el.addEventListener('input', updateCurlExample);
 });
@@ -243,11 +243,11 @@ function executeRequest(e) {
     method = 'POST';
 
     var requestBody = { game: game };
-    var playerId = document.getElementById('playerId').value;
+    var user_id = document.getElementById('user_id').value;
     var eventType = document.getElementById('eventType').value;
     var dataStr = document.getElementById('data').value;
 
-    if (playerId) requestBody.playerId = playerId;
+    if (user_id) requestBody.user_id = user_id;
     if (eventType) requestBody.eventType = eventType;
 
     if (dataStr) {
@@ -262,11 +262,11 @@ function executeRequest(e) {
     body = JSON.stringify(requestBody);
   } else {
     var params = new URLSearchParams({ game: game });
-    var filterPlayer = document.getElementById('filter_playerId').value;
+    var filterUser = document.getElementById('filter_user_id').value;
     var filterEvent = document.getElementById('filter_eventType').value;
     var limit = document.getElementById('limit').value;
 
-    if (filterPlayer) params.set('playerId', filterPlayer);
+    if (filterUser) params.set('user_id', filterUser);
     if (filterEvent) params.set('eventType', filterEvent);
     if (limit) params.set('limit', limit);
 

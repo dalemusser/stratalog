@@ -20,8 +20,8 @@ import (
 )
 
 const (
-	defaultPlayerLimit = 20
-	defaultLogLimit    = 25
+	defaultUserLimit = 20
+	defaultLogLimit  = 25
 )
 
 // Handler handles log browser HTTP requests.
@@ -61,7 +61,6 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Long())
 	defer cancel()
 
-	// Load games
 	games, err := h.store.ListGames(ctx)
 	if err != nil {
 		h.errLog.Log(r, "failed to list games", err)
@@ -69,20 +68,17 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get total log count across all games
 	totalAllLogs, _ := h.store.CountAllLogs(ctx)
 
-	// Parse query params
 	selectedGame := r.URL.Query().Get("game")
-	selectedPlayer := r.URL.Query().Get("player")
+	selectedUser := r.URL.Query().Get("user_id")
 	selectedEventType := r.URL.Query().Get("eventType")
-	playerSearch := r.URL.Query().Get("search")
+	userSearch := r.URL.Query().Get("search")
 	limitStr := r.URL.Query().Get("limit")
 	afterID := r.URL.Query().Get("after")
 	beforeID := r.URL.Query().Get("before")
 	pageStr := r.URL.Query().Get("page")
 
-	// Default to first game if none selected
 	if selectedGame == "" && len(games) > 0 {
 		selectedGame = games[0]
 	}
@@ -101,7 +97,6 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Load timezone groups
 	tzGroups, _ := timezones.Groups()
 
 	data := ListVM{
@@ -109,10 +104,10 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 		TimezoneGroups:    tzGroups,
 		Games:             games,
 		SelectedGame:      selectedGame,
-		SelectedPlayer:    selectedPlayer,
+		SelectedUser:      selectedUser,
 		SelectedEventType: selectedEventType,
-		PlayerSearch:      playerSearch,
-		PlayerPage:        page,
+		UserSearch:        userSearch,
+		UserPage:          page,
 		LogLimit:          limit,
 		Limit:             limit,
 		DefaultLimit:      h.defaultLimit,
@@ -120,39 +115,36 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 		TotalAllLogs:      totalAllLogs,
 	}
 
-	// If game selected and search provided, load players
-	if selectedGame != "" && playerSearch != "" {
-		players, total, err := h.store.ListPlayersWithCounts(ctx, selectedGame, playerSearch, page, defaultPlayerLimit)
+	if selectedGame != "" && userSearch != "" {
+		users, total, err := h.store.ListUsersWithCounts(ctx, selectedGame, userSearch, page, defaultUserLimit)
 		if err != nil {
-			h.logger.Warn("failed to list players with counts", zap.Error(err))
+			h.logger.Warn("failed to list users with counts", zap.Error(err))
 		} else {
-			data.Players = make([]PlayerRowVM, len(players))
-			for i, p := range players {
-				data.Players[i] = PlayerRowVM{
-					PlayerID: p.PlayerID,
-					LogCount: p.LogCount,
+			data.Users = make([]UserRowVM, len(users))
+			for i, u := range users {
+				data.Users[i] = UserRowVM{
+					UserID:   u.UserID,
+					LogCount: u.LogCount,
 				}
 			}
-			data.PlayerTotal = total
+			data.UserTotal = total
 
-			// Calculate pagination
-			data.PlayerRangeStart = (page-1)*defaultPlayerLimit + 1
-			data.PlayerRangeEnd = data.PlayerRangeStart + len(players) - 1
-			if data.PlayerRangeEnd > int(total) {
-				data.PlayerRangeEnd = int(total)
+			data.UserRangeStart = (page-1)*defaultUserLimit + 1
+			data.UserRangeEnd = data.UserRangeStart + len(users) - 1
+			if data.UserRangeEnd > int(total) {
+				data.UserRangeEnd = int(total)
 			}
 			if total == 0 {
-				data.PlayerRangeStart = 0
-				data.PlayerRangeEnd = 0
+				data.UserRangeStart = 0
+				data.UserRangeEnd = 0
 			}
 
-			data.PlayerHasPrev = page > 1
-			data.PlayerHasNext = int64(page*defaultPlayerLimit) < total
-			data.PlayerPrevPage = page - 1
-			data.PlayerNextPage = page + 1
+			data.UserHasPrev = page > 1
+			data.UserHasNext = int64(page*defaultUserLimit) < total
+			data.UserPrevPage = page - 1
+			data.UserNextPage = page + 1
 		}
 
-		// Load event types
 		eventTypes, err := h.store.ListEventTypes(ctx, selectedGame)
 		if err != nil {
 			h.logger.Warn("failed to list event types", zap.Error(err))
@@ -163,69 +155,64 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		// Load logs
-		logs, hasPrev, hasNext, err := h.store.ListLogs(ctx, selectedGame, selectedPlayer, selectedEventType, limit, afterID, beforeID)
+		logs, hasPrev, hasNext, err := h.store.ListLogs(ctx, selectedGame, selectedUser, selectedEventType, limit, afterID, beforeID)
 		if err != nil {
 			h.logger.Warn("failed to list logs", zap.Error(err))
 		} else {
 			data.Logs = make([]LogRowVM, len(logs))
 			for i, l := range logs {
-				// Build full log entry for display/download
 				fullEntry := buildFullLogEntry(l)
 				jsonBytes, _ := json.MarshalIndent(fullEntry, "", "  ")
 				data.Logs[i] = LogRowVM{
-					ID:          l.ID.Hex(),
-					Game:        l.Game,
-					PlayerID:    l.PlayerID,
-					EventType:   l.EventType,
-					Timestamp:   l.Timestamp,
+					ID:              l.ID.Hex(),
+					Game:            l.Game,
+					UserID:          l.UserID,
+					EventType:       l.EventType,
+					Timestamp:       l.Timestamp,
 					ServerTimestamp: l.ServerTimestamp,
-					Data:        string(jsonBytes),
+					Data:            string(jsonBytes),
 				}
 			}
 			data.HasPrev = hasPrev
 			data.HasNext = hasNext
 
-			// Set cursors for pagination
 			if len(logs) > 0 {
 				data.PrevCursor = logs[0].ID.Hex()
 				data.NextCursor = logs[len(logs)-1].ID.Hex()
 			}
 
-			// Get total count
-			total, err := h.store.CountLogs(ctx, selectedGame, selectedPlayer, selectedEventType)
+			total, err := h.store.CountLogs(ctx, selectedGame, selectedUser, selectedEventType)
 			if err == nil {
 				data.LogTotal = total
 			}
 		}
 	}
 
-	// Check if HTMX request targeting specific elements
 	if r.Header.Get("HX-Request") == "true" {
 		target := r.Header.Get("HX-Target")
 		switch target {
-		case "players-section":
-			templates.RenderSnippet(w, "logbrowser/players_partial", PlayersPartialVM{
-				SelectedGame:     selectedGame,
-				SelectedPlayer:   selectedPlayer,
-				PlayerSearch:     playerSearch,
-				Players:          data.Players,
-				PlayerTotal:      data.PlayerTotal,
-				PlayerPage:       page,
-				PlayerHasPrev:    data.PlayerHasPrev,
-				PlayerHasNext:    data.PlayerHasNext,
-				PlayerRangeStart: data.PlayerRangeStart,
-				PlayerRangeEnd:   data.PlayerRangeEnd,
-				PlayerPrevPage:   data.PlayerPrevPage,
-				PlayerNextPage:   data.PlayerNextPage,
-				Limit:            limit,
+		case "users-section":
+			templates.RenderSnippet(w, "logbrowser/users_partial", UsersPartialVM{
+				SelectedGame:   selectedGame,
+				SelectedUser:   selectedUser,
+				UserSearch:     userSearch,
+				Users:          data.Users,
+				UserTotal:      data.UserTotal,
+				UserPage:       page,
+				UserHasPrev:    data.UserHasPrev,
+				UserHasNext:    data.UserHasNext,
+				UserRangeStart: data.UserRangeStart,
+				UserRangeEnd:   data.UserRangeEnd,
+				UserPrevPage:   data.UserPrevPage,
+				UserNextPage:   data.UserNextPage,
+				Limit:          limit,
 			})
 			return
 		case "logs-section":
 			templates.RenderSnippet(w, "logbrowser/logs_partial", LogsPartialVM{
 				BaseVM:            data.BaseVM,
 				SelectedGame:      selectedGame,
-				SelectedPlayer:    selectedPlayer,
+				SelectedUser:      selectedUser,
 				SelectedEventType: selectedEventType,
 				Logs:              data.Logs,
 				Total:             data.LogTotal,
@@ -242,14 +229,14 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 	templates.Render(w, r, "logbrowser/list", data)
 }
 
-// ServePlayers handles GET /players - HTMX partial for players table.
-func (h *Handler) ServePlayers(w http.ResponseWriter, r *http.Request) {
+// ServeUsers handles GET /users — HTMX partial for the users table.
+func (h *Handler) ServeUsers(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Long())
 	defer cancel()
 
 	game := r.URL.Query().Get("game")
 	search := r.URL.Query().Get("search")
-	selectedPlayer := r.URL.Query().Get("player")
+	selectedUser := r.URL.Query().Get("user_id")
 	pageStr := r.URL.Query().Get("page")
 	limitStr := r.URL.Query().Get("limit")
 
@@ -267,55 +254,54 @@ func (h *Handler) ServePlayers(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	data := PlayersPartialVM{
-		SelectedGame:   game,
-		SelectedPlayer: selectedPlayer,
-		PlayerSearch:   search,
-		PlayerPage:     page,
-		Limit:          limit,
+	data := UsersPartialVM{
+		SelectedGame: game,
+		SelectedUser: selectedUser,
+		UserSearch:   search,
+		UserPage:     page,
+		Limit:        limit,
 	}
 
 	if game == "" || search == "" {
-		templates.RenderSnippet(w, "logbrowser/players_partial", data)
+		templates.RenderSnippet(w, "logbrowser/users_partial", data)
 		return
 	}
 
-	players, total, err := h.store.ListPlayersWithCounts(ctx, game, search, page, defaultPlayerLimit)
+	users, total, err := h.store.ListUsersWithCounts(ctx, game, search, page, defaultUserLimit)
 	if err != nil {
-		h.logger.Warn("failed to list players with counts", zap.Error(err))
-		templates.RenderSnippet(w, "logbrowser/players_partial", data)
+		h.logger.Warn("failed to list users with counts", zap.Error(err))
+		templates.RenderSnippet(w, "logbrowser/users_partial", data)
 		return
 	}
 
-	data.Players = make([]PlayerRowVM, len(players))
-	for i, p := range players {
-		data.Players[i] = PlayerRowVM{
-			PlayerID: p.PlayerID,
-			LogCount: p.LogCount,
+	data.Users = make([]UserRowVM, len(users))
+	for i, u := range users {
+		data.Users[i] = UserRowVM{
+			UserID:   u.UserID,
+			LogCount: u.LogCount,
 		}
 	}
-	data.PlayerTotal = total
+	data.UserTotal = total
 
-	// Calculate pagination
-	data.PlayerRangeStart = (page-1)*defaultPlayerLimit + 1
-	data.PlayerRangeEnd = data.PlayerRangeStart + len(players) - 1
-	if data.PlayerRangeEnd > int(total) {
-		data.PlayerRangeEnd = int(total)
+	data.UserRangeStart = (page-1)*defaultUserLimit + 1
+	data.UserRangeEnd = data.UserRangeStart + len(users) - 1
+	if data.UserRangeEnd > int(total) {
+		data.UserRangeEnd = int(total)
 	}
 	if total == 0 {
-		data.PlayerRangeStart = 0
-		data.PlayerRangeEnd = 0
+		data.UserRangeStart = 0
+		data.UserRangeEnd = 0
 	}
 
-	data.PlayerHasPrev = page > 1
-	data.PlayerHasNext = int64(page*defaultPlayerLimit) < total
-	data.PlayerPrevPage = page - 1
-	data.PlayerNextPage = page + 1
+	data.UserHasPrev = page > 1
+	data.UserHasNext = int64(page*defaultUserLimit) < total
+	data.UserPrevPage = page - 1
+	data.UserNextPage = page + 1
 
-	templates.RenderSnippet(w, "logbrowser/players_partial", data)
+	templates.RenderSnippet(w, "logbrowser/users_partial", data)
 }
 
-// ServeGamePicker handles GET /game-picker - game selector modal.
+// ServeGamePicker handles GET /game-picker — game selector modal.
 func (h *Handler) ServeGamePicker(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Medium())
 	defer cancel()
@@ -323,14 +309,12 @@ func (h *Handler) ServeGamePicker(w http.ResponseWriter, r *http.Request) {
 	selectedGame := r.URL.Query().Get("selected")
 	query := r.URL.Query().Get("q")
 
-	// Load games
 	games, err := h.store.ListGames(ctx)
 	if err != nil {
 		h.logger.Warn("failed to list games", zap.Error(err))
 		games = []string{}
 	}
 
-	// Filter games by query if provided
 	var filteredGames []GamePickerItem
 	queryLower := strings.ToLower(query)
 	for _, g := range games {
@@ -348,7 +332,6 @@ func (h *Handler) ServeGamePicker(w http.ResponseWriter, r *http.Request) {
 		Query:      query,
 	}
 
-	// If HTMX request targeting just the list, render only the list portion
 	if r.Header.Get("HX-Target") == "game-list" {
 		templates.RenderSnippet(w, "logbrowser/game_picker_list", data)
 		return
@@ -357,13 +340,13 @@ func (h *Handler) ServeGamePicker(w http.ResponseWriter, r *http.Request) {
 	templates.RenderSnippet(w, "logbrowser/game_picker", data)
 }
 
-// ServeLogs handles GET /data - HTMX partial for logs list.
+// ServeLogs handles GET /data — HTMX partial for logs list.
 func (h *Handler) ServeLogs(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Long())
 	defer cancel()
 
 	game := r.URL.Query().Get("game")
-	player := r.URL.Query().Get("player")
+	userID := r.URL.Query().Get("user_id")
 	eventType := r.URL.Query().Get("eventType")
 	limitStr := r.URL.Query().Get("limit")
 	afterID := r.URL.Query().Get("after")
@@ -379,7 +362,7 @@ func (h *Handler) ServeLogs(w http.ResponseWriter, r *http.Request) {
 	data := LogsPartialVM{
 		BaseVM:            viewdata.NewBaseVM(r, h.db, "", ""),
 		SelectedGame:      game,
-		SelectedPlayer:    player,
+		SelectedUser:      userID,
 		SelectedEventType: eventType,
 		Limit:             limit,
 	}
@@ -389,7 +372,7 @@ func (h *Handler) ServeLogs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	logs, hasPrev, hasNext, err := h.store.ListLogs(ctx, game, player, eventType, limit, afterID, beforeID)
+	logs, hasPrev, hasNext, err := h.store.ListLogs(ctx, game, userID, eventType, limit, afterID, beforeID)
 	if err != nil {
 		h.logger.Warn("failed to list logs", zap.Error(err))
 		templates.RenderSnippet(w, "logbrowser/logs_partial", data)
@@ -398,17 +381,16 @@ func (h *Handler) ServeLogs(w http.ResponseWriter, r *http.Request) {
 
 	data.Logs = make([]LogRowVM, len(logs))
 	for i, l := range logs {
-		// Build full log entry for display/download
 		fullEntry := buildFullLogEntry(l)
 		jsonBytes, _ := json.MarshalIndent(fullEntry, "", "  ")
 		data.Logs[i] = LogRowVM{
-			ID:          l.ID.Hex(),
-			Game:        l.Game,
-			PlayerID:    l.PlayerID,
-			EventType:   l.EventType,
-			Timestamp:   l.Timestamp,
+			ID:              l.ID.Hex(),
+			Game:            l.Game,
+			UserID:          l.UserID,
+			EventType:       l.EventType,
+			Timestamp:       l.Timestamp,
 			ServerTimestamp: l.ServerTimestamp,
-			Data:        string(jsonBytes),
+			Data:            string(jsonBytes),
 		}
 	}
 	data.HasPrev = hasPrev
@@ -419,7 +401,7 @@ func (h *Handler) ServeLogs(w http.ResponseWriter, r *http.Request) {
 		data.NextCursor = logs[len(logs)-1].ID.Hex()
 	}
 
-	total, err := h.store.CountLogs(ctx, game, player, eventType)
+	total, err := h.store.CountLogs(ctx, game, userID, eventType)
 	if err == nil {
 		data.Total = total
 		data.LogTotal = total
@@ -428,7 +410,7 @@ func (h *Handler) ServeLogs(w http.ResponseWriter, r *http.Request) {
 	templates.RenderSnippet(w, "logbrowser/logs_partial", data)
 }
 
-// HandleDeleteLog handles POST /{game}/{id}/delete - delete a single log.
+// HandleDeleteLog handles POST /{game}/{id}/delete — delete a single log.
 func (h *Handler) HandleDeleteLog(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Short())
 	defer cancel()
@@ -453,7 +435,6 @@ func (h *Handler) HandleDeleteLog(w http.ResponseWriter, r *http.Request) {
 		zap.String("id", idStr),
 	)
 
-	// Return success - the client will refresh the list
 	w.Header().Set("HX-Trigger", "log-deleted")
 	w.WriteHeader(http.StatusOK)
 }
@@ -481,16 +462,14 @@ func (h *Handler) ServeRecentLogs(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Medium())
 	defer cancel()
 
-	// Parse limit from query params
 	limitStr := r.URL.Query().Get("limit")
-	limit := 100 // default
+	limit := 100
 	if limitStr != "" {
 		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 1000 {
 			limit = l
 		}
 	}
 
-	// Load recent logs
 	logs, err := h.store.ListRecentLogs(ctx, limit)
 	if err != nil {
 		h.errLog.Log(r, "failed to list recent logs", err)
@@ -498,26 +477,21 @@ func (h *Handler) ServeRecentLogs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get total count
 	total, _ := h.store.CountAllLogs(ctx)
-
-	// Load timezone groups
 	tzGroups, _ := timezones.Groups()
 
-	// Build log rows
 	logRows := make([]LogRowVM, len(logs))
 	for i, l := range logs {
-		// Build full log entry for display/download
 		fullEntry := buildFullLogEntry(l)
 		jsonBytes, _ := json.MarshalIndent(fullEntry, "", "  ")
 		logRows[i] = LogRowVM{
-			ID:          l.ID.Hex(),
-			Game:        l.Game,
-			PlayerID:    l.PlayerID,
-			EventType:   l.EventType,
-			Timestamp:   l.Timestamp,
+			ID:              l.ID.Hex(),
+			Game:            l.Game,
+			UserID:          l.UserID,
+			EventType:       l.EventType,
+			Timestamp:       l.Timestamp,
 			ServerTimestamp: l.ServerTimestamp,
-			Data:        string(jsonBytes),
+			Data:            string(jsonBytes),
 		}
 	}
 
@@ -533,22 +507,19 @@ func (h *Handler) ServeRecentLogs(w http.ResponseWriter, r *http.Request) {
 	templates.Render(w, r, "logbrowser/recent", data)
 }
 
-// ServeRecentLogsStream handles GET /recent/stream - SSE endpoint for real-time log updates.
+// ServeRecentLogsStream handles GET /recent/stream — SSE endpoint for real-time log updates.
 func (h *Handler) ServeRecentLogsStream(w http.ResponseWriter, r *http.Request) {
-	// Set SSE headers
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
-	w.Header().Set("X-Accel-Buffering", "no") // Disable nginx buffering
+	w.Header().Set("X-Accel-Buffering", "no")
 
-	// Check if we can flush
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		http.Error(w, "Streaming not supported", http.StatusInternalServerError)
 		return
 	}
 
-	// Subscribe to the hub
 	ch := h.hub.Subscribe()
 	defer h.hub.Unsubscribe(ch)
 
@@ -556,11 +527,9 @@ func (h *Handler) ServeRecentLogsStream(w http.ResponseWriter, r *http.Request) 
 		zap.Int("subscribers", h.hub.SubscriberCount()),
 	)
 
-	// Send initial connection event
 	_, _ = w.Write([]byte("event: connected\ndata: {\"status\":\"connected\"}\n\n"))
 	flusher.Flush()
 
-	// Stream events until client disconnects
 	ctx := r.Context()
 	for {
 		select {
@@ -573,13 +542,11 @@ func (h *Handler) ServeRecentLogsStream(w http.ResponseWriter, r *http.Request) 
 			if !ok {
 				return
 			}
-			// Marshal event to JSON
 			jsonData, err := json.Marshal(event)
 			if err != nil {
 				h.logger.Warn("failed to marshal SSE event", zap.Error(err))
 				continue
 			}
-			// Write SSE event
 			_, _ = w.Write([]byte("event: log\ndata: "))
 			_, _ = w.Write(jsonData)
 			_, _ = w.Write([]byte("\n\n"))
@@ -588,66 +555,61 @@ func (h *Handler) ServeRecentLogsStream(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
-// HandleDeletePlayerLogs handles POST /{game}/player/{playerID}/delete - delete all logs for a player.
-func (h *Handler) HandleDeletePlayerLogs(w http.ResponseWriter, r *http.Request) {
+// HandleDeleteUserLogs handles POST /{game}/user/{userID}/delete — delete all logs for a user.
+func (h *Handler) HandleDeleteUserLogs(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Long())
 	defer cancel()
 
 	game := chi.URLParam(r, "game")
-	playerID := chi.URLParam(r, "playerID")
+	userID := chi.URLParam(r, "userID")
 
-	count, err := h.store.DeletePlayerLogs(ctx, game, playerID)
+	count, err := h.store.DeleteUserLogs(ctx, game, userID)
 	if err != nil {
-		h.errLog.Log(r, "failed to delete player logs", err)
+		h.errLog.Log(r, "failed to delete user logs", err)
 		http.Error(w, "Failed to delete logs", http.StatusInternalServerError)
 		return
 	}
 
-	h.logger.Info("player logs deleted",
+	h.logger.Info("user logs deleted",
 		zap.String("game", game),
-		zap.String("player_id", playerID),
+		zap.String("user_id", userID),
 		zap.Int64("count", count),
 	)
 
-	// Return success - the client will refresh
 	w.Header().Set("HX-Trigger", "logs-deleted")
 	w.WriteHeader(http.StatusOK)
 }
 
-// HandleDownloadPlayerLogs handles GET /download?game=X&player=Y - download all logs for a player as JSON.
-func (h *Handler) HandleDownloadPlayerLogs(w http.ResponseWriter, r *http.Request) {
+// HandleDownloadUserLogs handles GET /download?game=X&user_id=Y — download all logs for a user as JSON.
+func (h *Handler) HandleDownloadUserLogs(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Long())
 	defer cancel()
 
 	game := r.URL.Query().Get("game")
-	playerID := r.URL.Query().Get("player")
+	userID := r.URL.Query().Get("user_id")
 
-	// Get all logs for this player (no pagination limit)
-	logs, _, _, err := h.store.ListLogs(ctx, game, playerID, "", 10000, "", "")
+	logs, _, _, err := h.store.ListLogs(ctx, game, userID, "", 10000, "", "")
 	if err != nil {
 		h.errLog.Log(r, "failed to list logs for download", err)
 		http.Error(w, "Failed to load logs", http.StatusInternalServerError)
 		return
 	}
 
-	// Build full log entries
 	entries := make([]map[string]interface{}, len(logs))
 	for i, l := range logs {
 		entries[i] = buildFullLogEntry(l)
 	}
 
-	// Set download headers with timestamp
 	now := time.Now()
 	filename := "logs-" + game
-	if playerID != "" && playerID != "__empty__" {
-		filename += "-" + playerID
+	if userID != "" && userID != "__empty__" {
+		filename += "-" + userID
 	}
 	filename += "-" + now.Format("2006-01-02-150405") + ".json"
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Content-Disposition", "attachment; filename=\""+filename+"\"")
 
-	// Write JSON
 	encoder := json.NewEncoder(w)
 	encoder.SetIndent("", "  ")
 	if err := encoder.Encode(entries); err != nil {
@@ -656,13 +618,12 @@ func (h *Handler) HandleDownloadPlayerLogs(w http.ResponseWriter, r *http.Reques
 }
 
 // buildFullLogEntry constructs a complete log entry map for JSON serialization.
-// It includes all standard fields plus any extra data fields.
 func buildFullLogEntry(l LogEntry) map[string]interface{} {
 	entry := make(map[string]interface{})
 	entry["_id"] = l.ID.Hex()
 	entry["game"] = l.Game
-	if l.PlayerID != "" {
-		entry["playerId"] = l.PlayerID
+	if l.UserID != "" {
+		entry["user_id"] = l.UserID
 	}
 	if l.EventType != "" {
 		entry["eventType"] = l.EventType
@@ -672,7 +633,6 @@ func buildFullLogEntry(l LogEntry) map[string]interface{} {
 	}
 	entry["serverTimestamp"] = l.ServerTimestamp
 
-	// Add all extra data fields
 	for k, v := range l.Data {
 		entry[k] = v
 	}

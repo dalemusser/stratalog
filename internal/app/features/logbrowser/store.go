@@ -14,19 +14,20 @@ import (
 )
 
 // LogEntry represents a log entry in the database.
+// UserID is the 24-char hex string of stratahub.users._id.
 type LogEntry struct {
-	ID          primitive.ObjectID     `bson:"_id,omitempty"`
-	Game        string                 `bson:"game"`
-	PlayerID    string                 `bson:"playerId,omitempty"`
-	EventType   string                 `bson:"eventType,omitempty"`
-	Timestamp   *time.Time             `bson:"timestamp,omitempty"`
+	ID              primitive.ObjectID     `bson:"_id,omitempty"`
+	Game            string                 `bson:"game"`
+	UserID          string                 `bson:"user_id,omitempty"`
+	EventType       string                 `bson:"eventType,omitempty"`
+	Timestamp       *time.Time             `bson:"timestamp,omitempty"`
 	ServerTimestamp time.Time              `bson:"serverTimestamp"`
-	Data        map[string]interface{} `bson:"data,omitempty"`
+	Data            map[string]interface{} `bson:"data,omitempty"`
 }
 
-// UserWithCount represents a player with their log count.
+// UserWithCount represents a user with their log count.
 type UserWithCount struct {
-	PlayerID string
+	UserID   string
 	LogCount int64
 }
 
@@ -46,14 +47,12 @@ const logdataCollection = "logdata"
 
 // ListGames returns all games that have logs.
 func (s *Store) ListGames(ctx context.Context) ([]string, error) {
-	// Get distinct game values from the unified logdata collection
 	coll := s.db.Collection(logdataCollection)
 	values, err := coll.Distinct(ctx, "game", bson.M{})
 	if err != nil {
 		return nil, err
 	}
 
-	// Convert to string slice and sort
 	games := make([]string, 0, len(values))
 	for _, v := range values {
 		if game, ok := v.(string); ok && game != "" {
@@ -61,90 +60,79 @@ func (s *Store) ListGames(ctx context.Context) ([]string, error) {
 		}
 	}
 
-	// Sort alphabetically
 	sort.Strings(games)
 	return games, nil
 }
 
-// ListPlayersWithCounts returns players with their log counts for a game.
+// ListUsersWithCounts returns users with their log counts for a game.
 // Optimized to avoid scanning the full collection twice:
-// - Without search: uses distinct() for player list (fast index scan), then
-//   counts per player only for the current page.
-// - With search: uses a single aggregation with early $limit.
-func (s *Store) ListPlayersWithCounts(ctx context.Context, game, search string, page, limit int) ([]UserWithCount, int64, error) {
+//   - Without search: uses distinct() for the user list (fast index scan via
+//     idx_logdata_game_user_id), then counts per user only for the current page.
+//   - With search: uses distinct() + client-side prefix filter, then counts
+//     only for the current page.
+func (s *Store) ListUsersWithCounts(ctx context.Context, game, search string, page, limit int) ([]UserWithCount, int64, error) {
 	coll := s.db.Collection(logdataCollection)
 
 	if search == "" {
-		return s.listPlayersDistinct(ctx, coll, game, page, limit)
+		return s.listUsersDistinct(ctx, coll, game, page, limit)
 	}
-	return s.listPlayersSearch(ctx, coll, game, search, page, limit)
+	return s.listUsersSearch(ctx, coll, game, search, page, limit)
 }
 
-// listPlayersDistinct uses distinct() to get all player IDs for a game (fast index scan),
-// then counts logs for just the current page of players.
-func (s *Store) listPlayersDistinct(ctx context.Context, coll *mongo.Collection, game string, page, limit int) ([]UserWithCount, int64, error) {
-	// Get distinct player IDs — uses the idx_logdata_game_playerId index
-	values, err := coll.Distinct(ctx, "playerId", bson.M{"game": game})
+func (s *Store) listUsersDistinct(ctx context.Context, coll *mongo.Collection, game string, page, limit int) ([]UserWithCount, int64, error) {
+	values, err := coll.Distinct(ctx, "user_id", bson.M{"game": game})
 	if err != nil {
 		return nil, 0, err
 	}
 
-	// Collect and sort player IDs
-	var playerIDs []string
+	var userIDs []string
 	for _, v := range values {
 		id, _ := v.(string)
-		playerIDs = append(playerIDs, id)
+		userIDs = append(userIDs, id)
 	}
-	sort.Strings(playerIDs)
+	sort.Strings(userIDs)
 
-	total := int64(len(playerIDs))
+	total := int64(len(userIDs))
 
-	// Paginate the player list
 	skip := (page - 1) * limit
-	if skip >= len(playerIDs) {
+	if skip >= len(userIDs) {
 		return nil, total, nil
 	}
 	end := skip + limit
-	if end > len(playerIDs) {
-		end = len(playerIDs)
+	if end > len(userIDs) {
+		end = len(userIDs)
 	}
-	pageIDs := playerIDs[skip:end]
+	pageIDs := userIDs[skip:end]
 
-	// Get counts for just the current page of players (small targeted queries)
 	results := make([]UserWithCount, len(pageIDs))
-	for i, pid := range pageIDs {
+	for i, uid := range pageIDs {
 		filter := bson.M{"game": game}
-		if pid == "" {
+		if uid == "" {
 			filter["$or"] = []bson.M{
-				{"playerId": nil},
-				{"playerId": ""},
-				{"playerId": bson.M{"$exists": false}},
+				{"user_id": nil},
+				{"user_id": ""},
+				{"user_id": bson.M{"$exists": false}},
 			}
 		} else {
-			filter["playerId"] = pid
+			filter["user_id"] = uid
 		}
 		count, err := coll.CountDocuments(ctx, filter)
 		if err != nil {
-			s.logger.Warn("failed to count logs for player", zap.String("playerId", pid), zap.Error(err))
+			s.logger.Warn("failed to count logs for user", zap.String("user_id", uid), zap.Error(err))
 			count = 0
 		}
-		results[i] = UserWithCount{PlayerID: pid, LogCount: count}
+		results[i] = UserWithCount{UserID: uid, LogCount: count}
 	}
 
 	return results, total, nil
 }
 
-// listPlayersSearch uses distinct() with client-side filtering for search.
-// Much faster than aggregation — uses the game+playerId index for distinct,
-// then filters and counts only the current page.
-func (s *Store) listPlayersSearch(ctx context.Context, coll *mongo.Collection, game, search string, page, limit int) ([]UserWithCount, int64, error) {
-	// Get distinct player IDs for this game — fast index scan
-	values, err := coll.Distinct(ctx, "playerId", bson.M{"game": game})
+func (s *Store) listUsersSearch(ctx context.Context, coll *mongo.Collection, game, search string, page, limit int) ([]UserWithCount, int64, error) {
+	values, err := coll.Distinct(ctx, "user_id", bson.M{"game": game})
 	if err != nil {
 		return nil, 0, err
 	}
 
-	// Filter client-side by starts-with (case-insensitive)
 	searchLower := strings.ToLower(search)
 	var matched []string
 	for _, v := range values {
@@ -157,7 +145,6 @@ func (s *Store) listPlayersSearch(ctx context.Context, coll *mongo.Collection, g
 
 	total := int64(len(matched))
 
-	// Paginate
 	skip := (page - 1) * limit
 	if skip >= len(matched) {
 		return nil, total, nil
@@ -168,26 +155,23 @@ func (s *Store) listPlayersSearch(ctx context.Context, coll *mongo.Collection, g
 	}
 	pageIDs := matched[skip:end]
 
-	// Get counts for just the current page
 	results := make([]UserWithCount, len(pageIDs))
-	for i, pid := range pageIDs {
-		filter := bson.M{"game": game, "playerId": pid}
+	for i, uid := range pageIDs {
+		filter := bson.M{"game": game, "user_id": uid}
 		count, err := coll.CountDocuments(ctx, filter)
 		if err != nil {
 			count = 0
 		}
-		results[i] = UserWithCount{PlayerID: pid, LogCount: count}
+		results[i] = UserWithCount{UserID: uid, LogCount: count}
 	}
 
 	return results, total, nil
 }
 
 // ListEventTypes returns all event types for a game.
-// Optimized: uses distinct() instead of aggregation to avoid full collection scan.
 func (s *Store) ListEventTypes(ctx context.Context, game string) ([]EventTypeItem, error) {
 	coll := s.db.Collection(logdataCollection)
 
-	// Use distinct for fast index scan — idx_logdata_game_eventType
 	values, err := coll.Distinct(ctx, "eventType", bson.M{"game": game})
 	if err != nil {
 		return nil, err
@@ -209,30 +193,30 @@ func (s *Store) ListEventTypes(ctx context.Context, game string) ([]EventTypeIte
 }
 
 // ListLogs returns logs with cursor-based pagination.
-func (s *Store) ListLogs(ctx context.Context, game, playerID, eventType string, limit int, afterID, beforeID string) ([]LogEntry, bool, bool, error) {
+// userID is the 24-char hex of stratahub.users._id; pass "__empty__" to filter
+// for logs missing user_id (should never occur after the de-identification cutover).
+func (s *Store) ListLogs(ctx context.Context, game, userID, eventType string, limit int, afterID, beforeID string) ([]LogEntry, bool, bool, error) {
 	coll := s.db.Collection(logdataCollection)
 
 	filter := bson.M{"game": game}
-	if playerID == "__empty__" {
-		// Filter for logs with no playerId (null, empty string, or missing)
+	if userID == "__empty__" {
 		filter["$or"] = []bson.M{
-			{"playerId": nil},
-			{"playerId": ""},
-			{"playerId": bson.M{"$exists": false}},
+			{"user_id": nil},
+			{"user_id": ""},
+			{"user_id": bson.M{"$exists": false}},
 		}
-	} else if playerID != "" {
-		filter["playerId"] = playerID
+	} else if userID != "" {
+		filter["user_id"] = userID
 	}
 	if eventType != "" {
 		filter["eventType"] = eventType
 	}
 
-	// Handle cursor-based pagination
-	sortDir := -1 // Descending by default (newest first)
+	sortDir := -1
 	if beforeID != "" {
 		if oid, err := primitive.ObjectIDFromHex(beforeID); err == nil {
 			filter["_id"] = bson.M{"$gt": oid}
-			sortDir = 1 // Ascending to get items before cursor
+			sortDir = 1
 		}
 	} else if afterID != "" {
 		if oid, err := primitive.ObjectIDFromHex(afterID); err == nil {
@@ -240,9 +224,13 @@ func (s *Store) ListLogs(ctx context.Context, game, playerID, eventType string, 
 		}
 	}
 
+	// Sort by serverTimestamp only — DocumentDB's planner can't combine a
+	// compound sort with the idx_game_serverTimestamp index, so adding _id
+	// as a tiebreaker forces a full in-memory SORT step (12+ seconds on
+	// 1.8M+ rows) that exceeds the request timeout.
 	opts := options.Find().
-		SetSort(bson.D{{Key: "serverTimestamp", Value: sortDir}, {Key: "_id", Value: sortDir}}).
-		SetLimit(int64(limit + 1)) // Fetch one extra to detect if there are more
+		SetSort(bson.D{{Key: "serverTimestamp", Value: sortDir}}).
+		SetLimit(int64(limit + 1))
 
 	cur, err := coll.Find(ctx, filter, opts)
 	if err != nil {
@@ -251,9 +239,8 @@ func (s *Store) ListLogs(ctx context.Context, game, playerID, eventType string, 
 	defer cur.Close(ctx)
 
 	var entries []LogEntry
-	// Known fields that should not be included in Data
 	knownFields := map[string]bool{
-		"_id": true, "game": true, "playerId": true, "eventType": true,
+		"_id": true, "game": true, "user_id": true, "eventType": true,
 		"timestamp": true, "serverTimestamp": true,
 	}
 	for cur.Next(ctx) {
@@ -268,8 +255,8 @@ func (s *Store) ListLogs(ctx context.Context, game, playerID, eventType string, 
 		if id, ok := raw["_id"].(primitive.ObjectID); ok {
 			entry.ID = id
 		}
-		if pid, ok := raw["playerId"].(string); ok {
-			entry.PlayerID = pid
+		if uid, ok := raw["user_id"].(string); ok {
+			entry.UserID = uid
 		}
 		if et, ok := raw["eventType"].(string); ok {
 			entry.EventType = et
@@ -281,7 +268,6 @@ func (s *Store) ListLogs(ctx context.Context, game, playerID, eventType string, 
 		if st, ok := raw["serverTimestamp"].(primitive.DateTime); ok {
 			entry.ServerTimestamp = st.Time()
 		}
-		// Collect remaining fields into Data
 		data := make(map[string]interface{})
 		for k, v := range raw {
 			if !knownFields[k] {
@@ -294,20 +280,17 @@ func (s *Store) ListLogs(ctx context.Context, game, playerID, eventType string, 
 		entries = append(entries, entry)
 	}
 
-	// Determine pagination state
 	hasMore := len(entries) > limit
 	if hasMore {
 		entries = entries[:limit]
 	}
 
-	// If we were paginating backwards, reverse the results
 	if beforeID != "" && len(entries) > 0 {
 		for i, j := 0, len(entries)-1; i < j; i, j = i+1, j-1 {
 			entries[i], entries[j] = entries[j], entries[i]
 		}
 	}
 
-	// Check if there are previous items
 	hasPrev := afterID != "" || beforeID != ""
 	hasNext := hasMore || beforeID != ""
 
@@ -320,19 +303,18 @@ func (s *Store) ListLogs(ctx context.Context, game, playerID, eventType string, 
 }
 
 // CountLogs returns the total count of logs matching the filter.
-func (s *Store) CountLogs(ctx context.Context, game, playerID, eventType string) (int64, error) {
+func (s *Store) CountLogs(ctx context.Context, game, userID, eventType string) (int64, error) {
 	coll := s.db.Collection(logdataCollection)
 
 	filter := bson.M{"game": game}
-	if playerID == "__empty__" {
-		// Filter for logs with no playerId (null, empty string, or missing)
+	if userID == "__empty__" {
 		filter["$or"] = []bson.M{
-			{"playerId": nil},
-			{"playerId": ""},
-			{"playerId": bson.M{"$exists": false}},
+			{"user_id": nil},
+			{"user_id": ""},
+			{"user_id": bson.M{"$exists": false}},
 		}
-	} else if playerID != "" {
-		filter["playerId"] = playerID
+	} else if userID != "" {
+		filter["user_id"] = userID
 	}
 	if eventType != "" {
 		filter["eventType"] = eventType
@@ -344,25 +326,23 @@ func (s *Store) CountLogs(ctx context.Context, game, playerID, eventType string)
 // DeleteLog deletes a single log entry.
 func (s *Store) DeleteLog(ctx context.Context, game string, id primitive.ObjectID) error {
 	coll := s.db.Collection(logdataCollection)
-	// Filter by both _id and game for safety
 	_, err := coll.DeleteOne(ctx, bson.M{"_id": id, "game": game})
 	return err
 }
 
-// DeletePlayerLogs deletes all logs for a player in a game.
-func (s *Store) DeletePlayerLogs(ctx context.Context, game, playerID string) (int64, error) {
+// DeleteUserLogs deletes all logs for a user in a game.
+func (s *Store) DeleteUserLogs(ctx context.Context, game, userID string) (int64, error) {
 	coll := s.db.Collection(logdataCollection)
 
 	filter := bson.M{"game": game}
-	if playerID == "__empty__" {
-		// Delete logs with no playerId (null, empty string, or missing)
+	if userID == "__empty__" {
 		filter["$or"] = []bson.M{
-			{"playerId": nil},
-			{"playerId": ""},
-			{"playerId": bson.M{"$exists": false}},
+			{"user_id": nil},
+			{"user_id": ""},
+			{"user_id": bson.M{"$exists": false}},
 		}
 	} else {
-		filter["playerId"] = playerID
+		filter["user_id"] = userID
 	}
 
 	result, err := coll.DeleteMany(ctx, filter)
@@ -386,8 +366,10 @@ func (s *Store) DeleteGameLogs(ctx context.Context, game string) (int64, error) 
 func (s *Store) ListRecentLogs(ctx context.Context, limit int) ([]LogEntry, error) {
 	coll := s.db.Collection(logdataCollection)
 
+	// Sort by serverTimestamp only — see note above ListLogs. Same DocumentDB
+	// planner limitation; adding _id as a tiebreaker forces a COLLSCAN.
 	opts := options.Find().
-		SetSort(bson.D{{Key: "serverTimestamp", Value: -1}, {Key: "_id", Value: -1}}).
+		SetSort(bson.D{{Key: "serverTimestamp", Value: -1}}).
 		SetLimit(int64(limit))
 
 	cur, err := coll.Find(ctx, bson.M{}, opts)
@@ -397,9 +379,8 @@ func (s *Store) ListRecentLogs(ctx context.Context, limit int) ([]LogEntry, erro
 	defer cur.Close(ctx)
 
 	var entries []LogEntry
-	// Known fields that should not be included in Data
 	knownFields := map[string]bool{
-		"_id": true, "game": true, "playerId": true, "eventType": true,
+		"_id": true, "game": true, "user_id": true, "eventType": true,
 		"timestamp": true, "serverTimestamp": true,
 	}
 	for cur.Next(ctx) {
@@ -414,8 +395,8 @@ func (s *Store) ListRecentLogs(ctx context.Context, limit int) ([]LogEntry, erro
 		if id, ok := raw["_id"].(primitive.ObjectID); ok {
 			entry.ID = id
 		}
-		if pid, ok := raw["playerId"].(string); ok {
-			entry.PlayerID = pid
+		if uid, ok := raw["user_id"].(string); ok {
+			entry.UserID = uid
 		}
 		if et, ok := raw["eventType"].(string); ok {
 			entry.EventType = et
@@ -427,7 +408,6 @@ func (s *Store) ListRecentLogs(ctx context.Context, limit int) ([]LogEntry, erro
 		if st, ok := raw["serverTimestamp"].(primitive.DateTime); ok {
 			entry.ServerTimestamp = st.Time()
 		}
-		// Collect remaining fields into Data
 		data := make(map[string]interface{})
 		for k, v := range raw {
 			if !knownFields[k] {

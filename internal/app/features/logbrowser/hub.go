@@ -7,12 +7,12 @@ import (
 
 // LogEvent represents a log entry broadcast to SSE subscribers.
 type LogEvent struct {
-	ID          string                 `json:"id"`
-	Game        string                 `json:"game"`
-	PlayerID    string                 `json:"playerId,omitempty"`
-	EventType   string                 `json:"eventType,omitempty"`
+	ID              string                 `json:"id"`
+	Game            string                 `json:"game"`
+	UserID          string                 `json:"user_id,omitempty"`
+	EventType       string                 `json:"eventType,omitempty"`
 	ServerTimestamp time.Time              `json:"serverTimestamp"`
-	Data        map[string]interface{} `json:"data,omitempty"`
+	Data            map[string]interface{} `json:"data,omitempty"`
 }
 
 // Hub manages SSE subscribers for real-time log updates.

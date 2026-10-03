@@ -181,16 +181,16 @@ function prependLog(log) {
       '</details>';
   }
 
-  var playerLink = log.playerId ? '&player=' + encodeURIComponent(log.playerId) : '';
+  var userLink = log.user_id ? '&user_id=' + encodeURIComponent(log.user_id) : '';
 
   entry.innerHTML = '<div class="flex items-center justify-between mb-2">' +
     '<div class="text-sm text-gray-600 dark:text-gray-400">' +
     '<span class="font-semibold text-blue-600 dark:text-blue-400">[' + escapeHtml(log.game) + ']</span>' +
     (log.eventType ? ' <span class="font-semibold text-indigo-600 dark:text-indigo-400">[' + escapeHtml(log.eventType) + ']</span>' : '') +
-    (log.playerId ? ' <span class="text-green-600 dark:text-green-400">' + escapeHtml(log.playerId) + '</span> - ' : '') +
+    (log.user_id ? ' <span class="text-green-600 dark:text-green-400">' + escapeHtml(log.user_id) + '</span> - ' : '') +
     '<span class="tz-time" data-datetime="' + timestamp.toISOString() + '">' + formattedTime + '</span>' +
     '</div>' +
-    '<a href="/console/api/logs?game=' + encodeURIComponent(log.game) + playerLink + '" class="px-2 py-1 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700">View in Browser</a>' +
+    '<a href="/console/api/logs?game=' + encodeURIComponent(log.game) + userLink + '" class="px-2 py-1 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700">View in Browser</a>' +
     '</div>' + dataHtml;
 
   // Insert at top
@@ -320,10 +320,10 @@ window.addEventListener('beforeunload', function() {
     <div class="text-sm text-gray-600 dark:text-gray-400">
       <span class="font-semibold text-blue-600 dark:text-blue-400">[{{ .Game }}]</span>
       {{ if .EventType }}<span class="font-semibold text-indigo-600 dark:text-indigo-400">[{{ .EventType }}]</span> {{ end }}
-      {{ if .PlayerID }}<span class="text-green-600 dark:text-green-400">{{ .PlayerID }}</span> - {{ end }}
+      {{ if .UserID }}<span class="text-green-600 dark:text-green-400">{{ .UserID }}</span> - {{ end }}
       <span class="tz-time" data-datetime="{{ .ServerTimestamp.Format "2006-01-02T15:04:05Z" }}">{{ .ServerTimestamp.Format "Jan 02, 2006 15:04:05" }} UTC</span>
     </div>
-    <a href="/console/api/logs?game={{ .Game }}{{ if .PlayerID }}&player={{ .PlayerID }}{{ end }}"
+    <a href="/console/api/logs?game={{ .Game }}{{ if .UserID }}&user_id={{ .UserID }}{{ end }}"
        class="px-2 py-1 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700">
       View in Browser
     </a>

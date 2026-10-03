@@ -297,13 +297,13 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 
 	// Wire up SSE broadcasting: when logs are submitted, broadcast to connected clients
 	logHub := logbrowserHandler.Hub()
-	logapiHandler.SetBroadcaster(func(game, playerID, eventType string, serverTimestamp time.Time, data map[string]interface{}) {
+	logapiHandler.SetBroadcaster(func(game, userID, eventType string, serverTimestamp time.Time, data map[string]interface{}) {
 		logHub.Broadcast(logbrowserfeature.LogEvent{
-			Game:        game,
-			PlayerID:    playerID,
-			EventType:   eventType,
+			Game:            game,
+			UserID:          userID,
+			EventType:       eventType,
 			ServerTimestamp: serverTimestamp,
-			Data:        data,
+			Data:            data,
 		})
 	})
 

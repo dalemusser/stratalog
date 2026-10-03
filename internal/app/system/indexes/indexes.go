@@ -772,13 +772,13 @@ func ensureLogdata(ctx context.Context, db *mongo.Database) error {
 			},
 			Options: options.Index().SetName("idx_logdata_game_serverTimestamp"),
 		},
-		// Player queries within a game
+		// User queries within a game
 		{
 			Keys: bson.D{
 				{Key: "game", Value: 1},
-				{Key: "playerId", Value: 1},
+				{Key: "user_id", Value: 1},
 			},
-			Options: options.Index().SetName("idx_logdata_game_playerId"),
+			Options: options.Index().SetName("idx_logdata_game_user_id"),
 		},
 		// Event type queries within a game
 		{

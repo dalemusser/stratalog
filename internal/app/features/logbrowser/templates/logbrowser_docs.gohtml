@@ -28,7 +28,7 @@
     <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Single Entry Request</h3>
     <pre class="bg-gray-50 dark:bg-gray-900 p-4 rounded text-sm font-mono overflow-x-auto mb-4">{
   "game": "your-game-id",
-  "playerId": "player-id",
+  "user_id": "69b4449ec6006ac370dad9df",
   "eventType": "event-type",
   "data": {
     "key1": "value1",
@@ -40,9 +40,9 @@
     <pre class="bg-gray-50 dark:bg-gray-900 p-4 rounded text-sm font-mono overflow-x-auto mb-4">{
   "game": "your-game-id",
   "entries": [
-    {"playerId": "player-id", "eventType": "event-type-1", "data": {"key": "value"}},
-    {"playerId": "player-id", "eventType": "event-type-2", "data": {"key": "value"}},
-    {"playerId": "player-id", "eventType": "event-type-3", "data": {"key": "value"}}
+    {"user_id": "69b4449ec6006ac370dad9df", "eventType": "event-type-1", "data": {"key": "value"}},
+    {"user_id": "69b4449ec6006ac370dad9df", "eventType": "event-type-2", "data": {"key": "value"}},
+    {"user_id": "69b4449ec6006ac370dad9df", "eventType": "event-type-3", "data": {"key": "value"}}
   ]
 }</pre>
 
@@ -62,9 +62,9 @@
           <td class="px-4 py-2 text-gray-600 dark:text-gray-400">Game identifier</td>
         </tr>
         <tr>
-          <td class="px-4 py-2 font-mono text-gray-900 dark:text-gray-100">playerId</td>
+          <td class="px-4 py-2 font-mono text-gray-900 dark:text-gray-100">user_id</td>
           <td class="px-4 py-2 text-gray-500 dark:text-gray-400">No</td>
-          <td class="px-4 py-2 text-gray-600 dark:text-gray-400">Player identifier</td>
+          <td class="px-4 py-2 text-gray-600 dark:text-gray-400">User identifier (24-char hex of stratahub.users._id)</td>
         </tr>
         <tr>
           <td class="px-4 py-2 font-mono text-gray-900 dark:text-gray-100">eventType</td>
@@ -124,9 +124,9 @@
           <td class="px-4 py-2 text-gray-600 dark:text-gray-400">Filter by game name</td>
         </tr>
         <tr>
-          <td class="px-4 py-2 font-mono text-gray-900 dark:text-gray-100">playerId</td>
+          <td class="px-4 py-2 font-mono text-gray-900 dark:text-gray-100">user_id</td>
           <td class="px-4 py-2 text-gray-500 dark:text-gray-400">No</td>
-          <td class="px-4 py-2 text-gray-600 dark:text-gray-400">Filter by player ID</td>
+          <td class="px-4 py-2 text-gray-600 dark:text-gray-400">Filter by user.ID</td>
         </tr>
         <tr>
           <td class="px-4 py-2 font-mono text-gray-900 dark:text-gray-100">eventType</td>
@@ -162,7 +162,7 @@
     {
       "id": "507f1f77bcf86cd799439011",
       "game": "your-game-id",
-      "playerId": "player-id",
+      "user_id": "69b4449ec6006ac370dad9df",
       "eventType": "event-type",
       "serverTimestamp": "2026-01-29T10:30:00Z",
       "data": {

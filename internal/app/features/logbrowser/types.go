@@ -21,18 +21,18 @@ type ListVM struct {
 	// Total logs across all games
 	TotalAllLogs int64
 
-	// Player filter
-	Players        []PlayerRowVM
-	SelectedPlayer string
-	PlayerSearch   string
-	PlayerPage     int
-	PlayerTotal    int64
-	PlayerHasPrev  bool
-	PlayerHasNext  bool
-	PlayerPrevPage int
-	PlayerNextPage int
-	PlayerRangeStart int
-	PlayerRangeEnd   int
+	// User filter
+	Users          []UserRowVM
+	SelectedUser   string
+	UserSearch     string
+	UserPage       int
+	UserTotal      int64
+	UserHasPrev    bool
+	UserHasNext    bool
+	UserPrevPage   int
+	UserNextPage   int
+	UserRangeStart int
+	UserRangeEnd   int
 
 	// Event type filter
 	EventTypes        []string
@@ -42,7 +42,7 @@ type ListVM struct {
 	Logs         []LogRowVM
 	LogTotal     int64
 	LogLimit     int
-	Limit        int // Alias for LogLimit, used by players_content template
+	Limit        int // Alias for LogLimit, used by users_content template
 	DefaultLimit int
 	HasPrev      bool
 	HasNext    bool
@@ -55,43 +55,43 @@ type ListVM struct {
 
 // LogRowVM represents a single log entry in the browser.
 type LogRowVM struct {
-	ID          string
-	Game        string
-	PlayerID    string
-	EventType   string
-	Timestamp   *time.Time
+	ID              string
+	Game            string
+	UserID          string
+	EventType       string
+	Timestamp       *time.Time
 	ServerTimestamp time.Time
-	Data        string // JSON-formatted data
+	Data            string // JSON-formatted data
 }
 
-// PlayerRowVM represents a player with log count.
-type PlayerRowVM struct {
-	PlayerID string
+// UserRowVM represents a user with log count.
+type UserRowVM struct {
+	UserID   string
 	LogCount int64
 }
 
-// PlayersPartialVM is the view model for the players partial.
-type PlayersPartialVM struct {
-	SelectedGame     string
-	SelectedPlayer   string
-	PlayerSearch     string
-	Players          []PlayerRowVM
-	PlayerTotal      int64
-	PlayerPage       int
-	PlayerHasPrev    bool
-	PlayerHasNext    bool
-	PlayerRangeStart int
-	PlayerRangeEnd   int
-	PlayerPrevPage   int
-	PlayerNextPage   int
-	Limit            int
+// UsersPartialVM is the view model for the users partial.
+type UsersPartialVM struct {
+	SelectedGame   string
+	SelectedUser   string
+	UserSearch     string
+	Users          []UserRowVM
+	UserTotal      int64
+	UserPage       int
+	UserHasPrev    bool
+	UserHasNext    bool
+	UserRangeStart int
+	UserRangeEnd   int
+	UserPrevPage   int
+	UserNextPage   int
+	Limit          int
 }
 
 // LogsPartialVM is the view model for the logs partial.
 type LogsPartialVM struct {
 	viewdata.BaseVM
 	SelectedGame      string
-	SelectedPlayer    string
+	SelectedUser      string
 	SelectedEventType string
 	Logs              []LogRowVM
 	Total             int64

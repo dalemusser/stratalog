@@ -15,14 +15,19 @@ import (
 	"go.uber.org/zap"
 )
 
-// gameRegex validates game names (alphanumeric, underscores, hyphens only)
+// gameRegex validates game names (alphanumeric, underscores, hyphens only).
 var gameRegex = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
 
-// logdataCollection is the unified collection name for all log data
+// userIDRegex matches a 24-character lowercase hex string (Mongo ObjectID hex).
+// All player identity values must match this — playerId and other variants
+// are not accepted.
+var userIDRegex = regexp.MustCompile(`^[0-9a-f]{24}$`)
+
+// logdataCollection is the unified collection name for all log data.
 const logdataCollection = "logdata"
 
 // LogBroadcaster is a function that broadcasts log events to SSE subscribers.
-type LogBroadcaster func(game, playerID, eventType string, serverTimestamp time.Time, data map[string]interface{})
+type LogBroadcaster func(game, userID, eventType string, serverTimestamp time.Time, data map[string]interface{})
 
 // Handler handles log API requests.
 type Handler struct {
@@ -49,19 +54,19 @@ func (h *Handler) SetBroadcaster(b LogBroadcaster) {
 	h.broadcaster = b
 }
 
-
-// SubmitHandler handles POST /api/log/submit and POST /logs (legacy) requests.
+// SubmitHandler handles POST /api/log/submit (and the legacy /logs path).
 // It accepts both single log entries and batch submissions.
 //
-// Identity field: accepts either "playerId" (legacy) or "user_id" (new).
-// If "user_id" is present and "playerId" is not, user_id is copied to playerId
-// for consistent storage. The "user_id" field is removed from the stored document.
+// Identity contract:
+//   - Each entry MUST include "user_id" as a 24-character lowercase hex string
+//     (the hex form of stratahub.users._id).
+//   - "playerId" and other identity field names are rejected.
 //
 // Single entry format:
 //
 //	{
 //	    "game": "mhs",
-//	    "playerId": "player001",
+//	    "user_id": "69b4449ec6006ac370dad9df",
 //	    "eventType": "level_complete",
 //	    "level": 5,
 //	    "score": 1000
@@ -72,18 +77,15 @@ func (h *Handler) SetBroadcaster(b LogBroadcaster) {
 //	{
 //	    "game": "mhs",
 //	    "entries": [
-//	        {"playerId": "player001", "eventType": "level_start", "level": 5},
-//	        {"playerId": "player001", "eventType": "level_complete", "level": 5, "score": 1000}
+//	        {"user_id": "69b4449ec6006ac370dad9df", "eventType": "level_start", "level": 5},
+//	        {"user_id": "69b4449ec6006ac370dad9df", "eventType": "level_complete", "score": 1000}
 //	    ]
 //	}
 func (h *Handler) SubmitHandler(w http.ResponseWriter, r *http.Request) {
-	// Limit body size to 1MB for backward compatibility with strata_log
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 
-	// Parse the raw JSON to detect format
 	var raw map[string]interface{}
 	if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
-		// Check if it's a body too large error
 		if err.Error() == "http: request body too large" {
 			writeJSONError(w, r, "request body too large", "BODY_TOO_LARGE", http.StatusRequestEntityTooLarge)
 			return
@@ -92,78 +94,124 @@ func (h *Handler) SubmitHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check if this is a batch request (has "entries" array)
 	if entries, ok := raw["entries"].([]interface{}); ok {
 		h.handleBatchSubmit(w, r, raw, entries)
 		return
 	}
 
-	// Single entry submission
 	h.handleSingleSubmit(w, r, raw)
 }
 
+// identityKeysSeen returns the names of identity-shaped fields present in
+// the given entry. Used for diagnostic logging on rejections — captures the
+// shape of what the client sent without including the values themselves
+// (which may be PII or large payloads).
+func identityKeysSeen(entry map[string]interface{}) []string {
+	candidates := []string{"user_id", "playerId", "PlayerID", "player_id", "login_id", "loginID", "LoginID", "email", "Email"}
+	seen := make([]string, 0, 2)
+	for _, k := range candidates {
+		if _, ok := entry[k]; ok {
+			seen = append(seen, k)
+		}
+	}
+	return seen
+}
+
+// logRejection emits a Warn-level zap entry whenever a submission is
+// rejected client-side validation. This surfaces "client is misbehaving"
+// (e.g., a stale game build still sending playerId) on the server side
+// without having to wait for a bug report. Level Warn keeps healthy
+// traffic quiet but surfaces validation failures by default.
+func (h *Handler) logRejection(r *http.Request, batchIndex int, msg, code string, entry, envelope map[string]interface{}) {
+	game := ""
+	if envelope != nil {
+		game, _ = envelope["game"].(string)
+	}
+	if game == "" && entry != nil {
+		game, _ = entry["game"].(string)
+	}
+	fields := []zap.Field{
+		zap.String("code", code),
+		zap.String("error_msg", msg),
+		zap.String("game", game),
+		zap.String("remote_addr", r.RemoteAddr),
+		zap.String("user_agent", r.UserAgent()),
+	}
+	if batchIndex >= 0 {
+		fields = append(fields, zap.Int("batch_index", batchIndex))
+	}
+	if entry != nil {
+		fields = append(fields, zap.Strings("identity_keys_present", identityKeysSeen(entry)))
+	}
+	h.logger.Warn("rejected log submission", fields...)
+}
+
+// validateEntry checks the required fields on an entry: a present, valid
+// game name (single-entry only — batch entries inherit game from the
+// envelope), and a 24-char hex user_id. It also rejects the legacy
+// playerId field.
+func validateEntry(entry map[string]interface{}, requireGame bool) (errMsg, errCode string) {
+	if requireGame {
+		game, ok := entry["game"].(string)
+		if !ok || game == "" {
+			return "missing or invalid 'game' field", "MISSING_FIELD"
+		}
+		if !gameRegex.MatchString(game) {
+			return "invalid 'game' value", "INVALID_GAME"
+		}
+	}
+	if _, hasPlayerID := entry["playerId"]; hasPlayerID {
+		return "'playerId' is not accepted; submit 'user_id' instead", "DEPRECATED_FIELD"
+	}
+	uid, ok := entry["user_id"].(string)
+	if !ok || uid == "" {
+		return "missing or invalid 'user_id' field", "MISSING_FIELD"
+	}
+	if !userIDRegex.MatchString(uid) {
+		return "'user_id' must be a 24-character lowercase hex string", "INVALID_USER_ID"
+	}
+	return "", ""
+}
+
 // handleSingleSubmit processes a single log entry submission.
-// Stores documents flat in the unified logdata collection for backward compatibility
-// with the original strata_log API.
 func (h *Handler) handleSingleSubmit(w http.ResponseWriter, r *http.Request, raw map[string]interface{}) {
-	// Extract and validate required game field
-	game, ok := raw["game"].(string)
-	if !ok || game == "" {
-		writeJSONError(w, r, "missing or invalid 'game' field", "MISSING_FIELD", http.StatusBadRequest)
-		return
-	}
-	if !gameRegex.MatchString(game) {
-		writeJSONError(w, r, "invalid 'game' value", "INVALID_GAME", http.StatusBadRequest)
+	if msg, code := validateEntry(raw, true); msg != "" {
+		h.logRejection(r, -1, msg, code, raw, nil)
+		writeJSONError(w, r, msg, code, http.StatusBadRequest)
 		return
 	}
 
-	// Normalize identity: accept "user_id" as alias for "playerId".
-	// If user_id is present and playerId is not, copy user_id to playerId
-	// so all stored data uses a consistent field name.
-	normalizePlayerID(raw)
+	game, _ := raw["game"].(string)
+	userID, _ := raw["user_id"].(string)
 
-	// Add server timestamp - use "serverTimestamp" for backward compatibility with strata_log
 	now := time.Now().UTC()
 	raw["serverTimestamp"] = now
 
-	// Insert into unified logdata collection
 	coll := h.db.Collection(logdataCollection)
-	_, err := coll.InsertOne(r.Context(), raw)
-	if err != nil {
-		playerID, _ := raw["playerId"].(string)
+	if _, err := coll.InsertOne(r.Context(), raw); err != nil {
 		h.logger.Error("failed to insert log entry",
 			zap.String("game", game),
-			zap.String("playerId", playerID),
+			zap.String("user_id", userID),
 			zap.Error(err),
 		)
 		writeJSONError(w, r, "Failed to save log entry", "INSERT_FAILED", http.StatusInternalServerError)
 		return
 	}
 
-	playerID, _ := raw["playerId"].(string)
 	eventType, _ := raw["eventType"].(string)
 	h.logger.Debug("log entry saved",
 		zap.String("game", game),
-		zap.String("playerId", playerID),
+		zap.String("user_id", userID),
 		zap.String("eventType", eventType),
 	)
 
-	// Broadcast to SSE subscribers
 	if h.broadcaster != nil {
-		// Extract data fields (everything except known fields)
-		data := make(map[string]interface{})
-		for k, v := range raw {
-			if k != "game" && k != "playerId" && k != "eventType" && k != "timestamp" && k != "serverTimestamp" && k != "_id" {
-				data[k] = v
-			}
-		}
-		h.broadcaster(game, playerID, eventType, now, data)
+		data := extractData(raw)
+		h.broadcaster(game, userID, eventType, now, data)
 	}
 
-	// Ensure indexes exist (async)
 	go h.ensureIndexes()
 
-	// Return backward-compatible response
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	_ = json.NewEncoder(w).Encode(LogResponse{
@@ -173,53 +221,52 @@ func (h *Handler) handleSingleSubmit(w http.ResponseWriter, r *http.Request, raw
 }
 
 // handleBatchSubmit processes a batch log entry submission.
-// Stores documents flat in the unified logdata collection for backward compatibility.
 func (h *Handler) handleBatchSubmit(w http.ResponseWriter, r *http.Request, raw map[string]interface{}, entries []interface{}) {
-	// Extract and validate required game field
 	game, ok := raw["game"].(string)
 	if !ok || game == "" {
+		h.logRejection(r, -1, "missing or invalid 'game' field", "MISSING_FIELD", nil, raw)
 		writeJSONError(w, r, "missing or invalid 'game' field", "MISSING_FIELD", http.StatusBadRequest)
 		return
 	}
 	if !gameRegex.MatchString(game) {
+		h.logRejection(r, -1, "invalid 'game' value", "INVALID_GAME", nil, raw)
 		writeJSONError(w, r, "invalid 'game' value", "INVALID_GAME", http.StatusBadRequest)
 		return
 	}
 
 	if len(entries) == 0 {
+		h.logRejection(r, -1, "Entries array is empty", "EMPTY_ENTRIES", nil, raw)
 		writeJSONError(w, r, "Entries array is empty", "EMPTY_ENTRIES", http.StatusBadRequest)
 		return
 	}
-
 	if len(entries) > h.maxBatchSize {
+		h.logRejection(r, -1, "Batch size exceeds maximum of "+strconv.Itoa(h.maxBatchSize), "BATCH_TOO_LARGE", nil, raw)
 		writeJSONError(w, r, "Batch size exceeds maximum of "+strconv.Itoa(h.maxBatchSize), "BATCH_TOO_LARGE", http.StatusBadRequest)
 		return
 	}
 
-	// Convert entries to flat documents with game and serverTimestamp added
 	now := time.Now().UTC()
 	docs := make([]interface{}, 0, len(entries))
 
 	for i, e := range entries {
 		entryMap, ok := e.(map[string]interface{})
 		if !ok {
+			h.logRejection(r, i, "Invalid entry at index "+strconv.Itoa(i), "INVALID_ENTRY", nil, raw)
 			writeJSONError(w, r, "Invalid entry at index "+strconv.Itoa(i), "INVALID_ENTRY", http.StatusBadRequest)
 			return
 		}
-
-		// Normalize identity: accept "user_id" as alias for "playerId"
-		normalizePlayerID(entryMap)
-
-		// Add game and serverTimestamp to each entry (stored flat)
+		if msg, code := validateEntry(entryMap, false); msg != "" {
+			h.logRejection(r, i, msg, code, entryMap, raw)
+			writeJSONError(w, r, "entry "+strconv.Itoa(i)+": "+msg, code, http.StatusBadRequest)
+			return
+		}
 		entryMap["game"] = game
 		entryMap["serverTimestamp"] = now
 		docs = append(docs, entryMap)
 	}
 
-	// Insert all entries into unified logdata collection
 	coll := h.db.Collection(logdataCollection)
-	_, err := coll.InsertMany(r.Context(), docs)
-	if err != nil {
+	if _, err := coll.InsertMany(r.Context(), docs); err != nil {
 		h.logger.Error("failed to insert batch log entries",
 			zap.String("game", game),
 			zap.Int("count", len(docs)),
@@ -234,28 +281,19 @@ func (h *Handler) handleBatchSubmit(w http.ResponseWriter, r *http.Request, raw 
 		zap.Int("count", len(docs)),
 	)
 
-	// Broadcast each entry to SSE subscribers
 	if h.broadcaster != nil {
 		for _, doc := range docs {
 			if entryMap, ok := doc.(map[string]interface{}); ok {
-				playerID, _ := entryMap["playerId"].(string)
+				userID, _ := entryMap["user_id"].(string)
 				eventType, _ := entryMap["eventType"].(string)
-				// Extract data fields (everything except known fields)
-				data := make(map[string]interface{})
-				for k, v := range entryMap {
-					if k != "game" && k != "playerId" && k != "eventType" && k != "timestamp" && k != "serverTimestamp" && k != "_id" {
-						data[k] = v
-					}
-				}
-				h.broadcaster(game, playerID, eventType, now, data)
+				data := extractData(entryMap)
+				h.broadcaster(game, userID, eventType, now, data)
 			}
 		}
 	}
 
-	// Ensure indexes exist (async)
 	go h.ensureIndexes()
 
-	// Return backward-compatible response
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	_ = json.NewEncoder(w).Encode(LogResponse{
@@ -267,7 +305,7 @@ func (h *Handler) handleBatchSubmit(w http.ResponseWriter, r *http.Request, raw 
 // ListHandler handles GET /logs and GET /api/v1/logs requests.
 // Query parameters:
 //   - game (required): Filter by game name
-//   - playerId: Filter by player ID
+//   - user_id: Filter by user ID (24-char hex)
 //   - eventType: Filter by event type
 //   - start_time: Filter entries after this time (RFC3339)
 //   - end_time: Filter entries before this time (RFC3339)
@@ -280,18 +318,25 @@ func (h *Handler) ListHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse query parameters — accept "user_id" as alias for "playerId"
-	playerID := r.URL.Query().Get("playerId")
-	if playerID == "" {
-		playerID = r.URL.Query().Get("user_id")
+	userID := r.URL.Query().Get("user_id")
+	if userID != "" && !userIDRegex.MatchString(userID) {
+		h.logger.Warn("rejected log list query",
+			zap.String("code", "INVALID_USER_ID"),
+			zap.String("error_msg", "'user_id' must be a 24-character lowercase hex string"),
+			zap.String("game", game),
+			zap.String("remote_addr", r.RemoteAddr),
+			zap.String("user_agent", r.UserAgent()),
+		)
+		writeJSONError(w, r, "'user_id' must be a 24-character lowercase hex string", "INVALID_USER_ID", http.StatusBadRequest)
+		return
 	}
+
 	params := LogQueryParams{
 		Game:      game,
-		PlayerID:  playerID,
+		UserID:    userID,
 		EventType: r.URL.Query().Get("eventType"),
 	}
 
-	// Parse time parameters
 	if st := r.URL.Query().Get("start_time"); st != "" {
 		if t, err := time.Parse(time.RFC3339, st); err == nil {
 			params.StartTime = &t
@@ -303,7 +348,6 @@ func (h *Handler) ListHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Parse pagination (limit=0 means all records)
 	params.Limit = 100
 	if l := r.URL.Query().Get("limit"); l != "" {
 		if n, err := strconv.Atoi(l); err == nil && n >= 0 {
@@ -316,10 +360,9 @@ func (h *Handler) ListHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Build filter
 	filter := bson.M{"game": game}
-	if params.PlayerID != "" {
-		filter["playerId"] = params.PlayerID
+	if params.UserID != "" {
+		filter["user_id"] = params.UserID
 	}
 	if params.EventType != "" {
 		filter["eventType"] = params.EventType
@@ -335,10 +378,8 @@ func (h *Handler) ListHandler(w http.ResponseWriter, r *http.Request) {
 		filter["serverTimestamp"] = timeFilter
 	}
 
-	// Query the unified logdata collection
 	coll := h.db.Collection(logdataCollection)
 
-	// Get total count
 	total, err := coll.CountDocuments(r.Context(), filter)
 	if err != nil {
 		h.logger.Error("failed to count log entries",
@@ -349,7 +390,6 @@ func (h *Handler) ListHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Query entries
 	opts := options.Find().
 		SetSort(bson.D{{Key: "serverTimestamp", Value: -1}}).
 		SetSkip(int64(params.Offset))
@@ -378,7 +418,6 @@ func (h *Handler) ListHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Return empty array instead of null
 	if entries == nil {
 		entries = []LogEntry{}
 	}
@@ -408,7 +447,7 @@ func (h *Handler) ensureIndexes() {
 		{
 			Keys: bson.D{
 				{Key: "game", Value: 1},
-				{Key: "playerId", Value: 1},
+				{Key: "user_id", Value: 1},
 			},
 		},
 		{
@@ -435,7 +474,6 @@ func (h *Handler) ViewHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse limit (default 100, use 0 for all)
 	limit := 100
 	if l := r.URL.Query().Get("limit"); l != "" {
 		if n, err := strconv.Atoi(l); err == nil && n >= 0 {
@@ -443,7 +481,6 @@ func (h *Handler) ViewHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Query logs from unified logdata collection
 	coll := h.db.Collection(logdataCollection)
 	filter := bson.M{"game": game}
 
@@ -474,11 +511,9 @@ func (h *Handler) ViewHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Build simple HTML response
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 
-	// Write HTML header
 	_, _ = w.Write([]byte(`<!DOCTYPE html>
 <html>
 <head>
@@ -489,7 +524,7 @@ h1 { margin-bottom: 20px; }
 .entry { background: #f5f5f5; padding: 10px; margin-bottom: 10px; border-radius: 4px; }
 .timestamp { color: #666; font-size: 0.9em; }
 .event-type { font-weight: bold; color: #0066cc; }
-.player-id { color: #006600; }
+.user-id { color: #006600; }
 .data { white-space: pre-wrap; background: #fff; padding: 5px; margin-top: 5px; border: 1px solid #ddd; }
 </style>
 </head>
@@ -498,15 +533,14 @@ h1 { margin-bottom: 20px; }
 <p>Showing ` + strconv.Itoa(len(entries)) + ` entries</p>
 `))
 
-	// Write entries
 	for _, entry := range entries {
 		_, _ = w.Write([]byte(`<div class="entry">`))
 		_, _ = w.Write([]byte(`<span class="timestamp">` + entry.ServerTimestamp.Format(time.RFC3339) + `</span>`))
 		if entry.EventType != "" {
 			_, _ = w.Write([]byte(` <span class="event-type">[` + entry.EventType + `]</span>`))
 		}
-		if entry.PlayerID != "" {
-			_, _ = w.Write([]byte(` <span class="player-id">Player: ` + entry.PlayerID + `</span>`))
+		if entry.UserID != "" {
+			_, _ = w.Write([]byte(` <span class="user-id">User: ` + entry.UserID + `</span>`))
 		}
 		if len(entry.Data) > 0 {
 			dataJSON, _ := json.MarshalIndent(entry.Data, "", "  ")
@@ -515,7 +549,6 @@ h1 { margin-bottom: 20px; }
 		_, _ = w.Write([]byte(`</div>`))
 	}
 
-	// Write footer
 	_, _ = w.Write([]byte(`</body></html>`))
 }
 
@@ -528,7 +561,6 @@ func (h *Handler) DownloadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse limit (default 1000, use 0 for all)
 	limit := 1000
 	if l := r.URL.Query().Get("limit"); l != "" {
 		if n, err := strconv.Atoi(l); err == nil && n >= 0 {
@@ -536,7 +568,6 @@ func (h *Handler) DownloadHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Query logs from unified logdata collection
 	coll := h.db.Collection(logdataCollection)
 	filter := bson.M{"game": game}
 
@@ -567,35 +598,33 @@ func (h *Handler) DownloadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Return empty array instead of null
 	if entries == nil {
 		entries = []LogEntry{}
 	}
 
-	// Set headers for download
 	filename := game + "_logs_" + time.Now().Format("20060102_150405") + ".json"
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Content-Disposition", "attachment; filename=\""+filename+"\"")
 	_ = json.NewEncoder(w).Encode(entries)
 }
 
-// normalizePlayerID copies "user_id" to "playerId" if playerId is absent.
-// This allows new game builds to send "user_id" while keeping the stored
-// field name consistent for existing queries, grader, and dashboard.
-// If both are present, playerId takes precedence (no overwrite).
-func normalizePlayerID(m map[string]interface{}) {
-	_, hasPlayerID := m["playerId"]
-	userID, hasUserID := m["user_id"]
-	if hasUserID && !hasPlayerID {
-		m["playerId"] = userID
+// extractData returns the entry map minus the structural fields stratalog
+// owns (game, user_id, eventType, timestamps, _id). The remainder is treated
+// as the per-entry payload broadcast to SSE subscribers.
+func extractData(entry map[string]interface{}) map[string]interface{} {
+	data := make(map[string]interface{})
+	for k, v := range entry {
+		switch k {
+		case "game", "user_id", "eventType", "timestamp", "serverTimestamp", "_id":
+			continue
+		}
+		data[k] = v
 	}
-	// Remove user_id from the stored document to avoid duplicate identity fields
-	delete(m, "user_id")
+	return data
 }
 
 // writeJSONError writes a JSON error response.
 func writeJSONError(w http.ResponseWriter, r *http.Request, msg, code string, status int) {
-	// Set error message in ledger context for debugging
 	ledger.SetErrorMessage(r.Context(), msg)
 
 	w.Header().Set("Content-Type", "application/json")

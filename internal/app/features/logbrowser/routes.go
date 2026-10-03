@@ -23,16 +23,16 @@ func Routes(h *Handler, sessionMgr *auth.SessionManager) chi.Router {
 	r.Get("/recent/stream", h.ServeRecentLogsStream)
 
 	// HTMX partials
-	r.Get("/players", h.ServePlayers)
+	r.Get("/users", h.ServeUsers)
 	r.Get("/game-picker", h.ServeGamePicker)
 	r.Get("/data", h.ServeLogs)
 
 	// Download operations
-	r.Get("/download", h.HandleDownloadPlayerLogs)
+	r.Get("/download", h.HandleDownloadUserLogs)
 
 	// Delete operations (admin only in practice, checked in handler)
 	r.Post("/{game}/{id}/delete", h.HandleDeleteLog)
-	r.Post("/{game}/player/{playerID}/delete", h.HandleDeletePlayerLogs)
+	r.Post("/{game}/user/{userID}/delete", h.HandleDeleteUserLogs)
 
 	return r
 }
