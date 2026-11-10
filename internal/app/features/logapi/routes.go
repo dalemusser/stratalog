@@ -16,23 +16,32 @@ import (
 //   - POST /api/log/submit - Submit single or batch log entries
 //   - GET /api/log/list - List log entries with filters (only when
 //     readEnabled; otherwise it answers 410, see Handler.DisabledHandler)
+//   - POST /api/log/probe - Reachability probe (see ProbeHandler); no key,
+//     no ledger, no stats
 func Routes(h *Handler, statsRecorder *apistats.Recorder, ledgerConfig ledger.Config, apiKeys []string, restricted auth.RestrictedKey, readEnabled bool, logger *zap.Logger) chi.Router {
 	r := chi.NewRouter()
 
-	// Ledger middleware for error logging
-	r.Use(ledger.Middleware(ledgerConfig))
+	// The probe sits beside the game's own routes (same host, same path
+	// prefix, same CORS) but outside the ledger and the key check: it stores
+	// nothing and must answer the same whatever key the page sends.
+	r.Post("/probe", ProbeHandler)
 
-	// API key authentication middleware
-	r.Use(auth.APIKeyAuthRestricted(apiKeys, restricted, logger))
+	r.Group(func(r chi.Router) {
+		// Ledger middleware for error logging
+		r.Use(ledger.Middleware(ledgerConfig))
 
-	// Submit endpoint
-	r.Route("/submit", func(r chi.Router) {
-		r.With(apistats.MiddlewareWithRecorder(statsRecorder, apistatsstore.StatTypeLogSubmit)).Post("/", h.SubmitHandler)
-	})
+		// API key authentication middleware
+		r.Use(auth.APIKeyAuthRestricted(apiKeys, restricted, logger))
 
-	// List endpoint
-	r.Route("/list", func(r chi.Router) {
-		r.With(apistats.MiddlewareWithRecorder(statsRecorder, apistatsstore.StatTypeLogList)).Get("/", h.listOrDisabled(readEnabled))
+		// Submit endpoint
+		r.Route("/submit", func(r chi.Router) {
+			r.With(apistats.MiddlewareWithRecorder(statsRecorder, apistatsstore.StatTypeLogSubmit)).Post("/", h.SubmitHandler)
+		})
+
+		// List endpoint
+		r.Route("/list", func(r chi.Router) {
+			r.With(apistats.MiddlewareWithRecorder(statsRecorder, apistatsstore.StatTypeLogList)).Get("/", h.listOrDisabled(readEnabled))
+		})
 	})
 
 	return r
